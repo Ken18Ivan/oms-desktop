@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* THIS IS THE FIX: It tells Tailwind to look at the .dark class on the <html> tag */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  body {
+    /* Set a transition so the color change looks smooth and HD */
+    transition: background-color 0.5s ease, color 0.5s ease;
+  }
+
+  /* Custom Webkit Scrollbars for a formal desktop app aesthetic */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1; /* slate-300 */
+    border-radius: 10px;
+  }
+  /* Dark mode scrollbars */
+  html.dark ::-webkit-scrollbar-thumb {
+    background-color: #334155; /* slate-700 */
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8; /* slate-400 */
+  }
+  html.dark ::-webkit-scrollbar-thumb:hover {
+    background-color: #475569; /* slate-600 */
+  }
+}
+
+/* ====================================
+   PRINT STYLES FOR ALL TEMPLATES
+   ==================================== */
+
+/* Default page margins for Patotoo and Masterlist */
+@page {
+  margin: 0.75in;
+}
+
+/* Strip print (8.27 x 3in) needs minimal margin */
+@page strip {
+  size: 8.27in 3in;
+  margin: 0;
+}
+
+@media print {
+  /* Force formal serif font on all printed output */
+  .print-patotoo,
+  .print-masterlist,
+  .print-strip {
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Patotoo already has its own padding via p-[1in], so remove the @page margin overlap */
+  .print-patotoo {
+    padding: 0 !important;
+  }
+
+  /* Masterlist - remove excess inline padding since @page handles margin */
+  .print-masterlist {
+    padding: 0 !important;
+  }
+
+  /* Strip template gets its own page name */
+  .print-strip {
+    page: strip;
+  }
+
+  /* Ensure tables don't break mid-row */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+
+  /* Hide non-print elements */
+  .no-print { display: none !important; }
+}

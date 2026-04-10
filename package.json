@@ -1,0 +1,47 @@
+{
+  "private": true,
+  "name": "oms-portal",
+  "description": "Officer Management System",
+  "version": "1.0.0",
+  "author": "005Production",
+  "type": "module",
+  "main": "app/main.js",
+  "scripts": {
+    "dev": "nextron --renderer-port 8888",
+    "build": "nextron build",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.iligan.oms",
+    "productName": "OMS Portal",
+    "directories": {
+      "buildResources": "resources"
+    },
+    "win": {
+      "icon": "resources/logo.ico",
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "dependencies": {
+    "electron-serve": "^3.0.0",
+    "electron-store": "^11.0.2",
+    "lucide-react": "^1.7.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^20.11.16",
+    "@types/react": "^19.2.14",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
+    "next": "^16.2.1",
+    "nextron": "^10.0.0",
+    "postcss": "^8.5.8",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.7.3"
+  }
+}
