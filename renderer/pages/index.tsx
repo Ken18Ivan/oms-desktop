@@ -1,17 +1,23 @@
 'use client';
 
+import React, { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { OMSProvider, useOMS } from '../context/OMSContext';
 import LoginScreen from '../components/LoginScreen';
 import DashboardView from '../components/views/DashboardView';
 import OfficerDatabaseView from '../components/views/OfficerDatabaseView';
 import OfficerProfileForm from '../components/views/OfficerProfileForm';
+import OfficersEncodingView from '../components/views/OfficersEncodingView';
 import SettingsView from '../components/views/SettingsView';
 import { formatFullName } from '../utils';
+import { X, Menu, User } from 'lucide-react';
 
 // ── Inner app (uses context) ─────────────────────────────────
 function AppShell() {
   const {
     isLoaded, isAuthenticated, setIsAuthenticated,
+    usernameInput, setUsernameInput,
+    currentUsername, setCurrentUsername,
     passwordInput, setPasswordInput, showPassword, setShowPassword, authError, handleLogin,
     isDarkMode, toggleDarkMode, showHeader,
     view, handleNavigation,
@@ -36,6 +42,7 @@ function AppShell() {
     activeDropdown, setActiveDropdown,
     focusedIndex, setFocusedIndex,
     handleKeyDown,
+    isLoading,
     selectedOfficers, toggleSelectAll, toggleSelectOfficer, clearSelection, deleteSelected,
     isPatotooView, setIsPatotooView,
     patotooData, setPatotooData,
@@ -46,7 +53,8 @@ function AppShell() {
     debugLog,
     newDeptName, setNewDeptName,
     newDeptTarget, setNewDeptTarget,
-    addDepartment, updateDeptTarget, deleteDepartment,
+    addDepartment,
+    updateDeptTarget, deleteDepartment, bulkImportDepartments,
     newRoleInputs, setNewRoleInputs,
     addSpecificRole, removeSpecificRole,
     newPurokName, setNewPurokName,
@@ -54,8 +62,48 @@ function AppShell() {
     addPurok, deletePurok,
     newPassword, setNewPassword,
     confirmPassword, setConfirmPassword,
+    newUsername, setNewUsername,
+    currentPasswordForAuth, setCurrentPasswordForAuth,
+    updateUsername, updatePassword,
+    authModalOpen, setAuthModalOpen,
+    authModalStep, setAuthModalStep,
+    authModalCurrentPassword, setAuthModalCurrentPassword,
+    authModalNewUsername, setAuthModalNewUsername,
+    authModalNewPassword, setAuthModalNewPassword,
+    authModalConfirmPassword, setAuthModalConfirmPassword,
+    openChangeAuthModal, closeChangeAuthModal,
+    verifyCurrentPassword, submitAuthChange,
     allRolesMasterList, uniquePurokValues,
+    autoBackupEnabled, setAutoBackupEnabled,
+    autoBackupFrequency, setAutoBackupFrequency,
   } = useOMS();
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+S to save (only in PROFILE view)
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        if (view === 'PROFILE' && formState) {
+          e.preventDefault();
+          saveOfficer();
+        }
+      }
+      // Ctrl+F to focus search (only in DATABASE view)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        if (view === 'DATABASE') {
+          e.preventDefault();
+          const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+          if (searchInput) searchInput.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [view, formState, saveOfficer]);
 
   // ── Loading screen ────────────────────────────────────────
   if (!isLoaded) {
@@ -82,6 +130,8 @@ function AppShell() {
   if (!isAuthenticated) {
     return (
       <LoginScreen
+        usernameInput={usernameInput}
+        setUsernameInput={setUsernameInput}
         passwordInput={passwordInput}
         setPasswordInput={setPasswordInput}
         showPassword={showPassword}
@@ -100,6 +150,16 @@ function AppShell() {
         : 'bg-[#f4f6f8] dark:bg-[#0f172a] text-gray-900 dark:text-gray-100'
       } print:bg-white print:pb-0 print:min-h-0`}>
 
+      {/* GLOBAL LOADING OVERLAY */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 flex flex-col items-center shadow-2xl">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-600 border-t-transparent mb-4"></div>
+            <p className="text-gray-800 dark:text-white font-bold">Processing...</p>
+          </div>
+        </div>
+      )}
+
       {/* GLOBAL NOTIFICATION TOAST */}
       {notification.show && (
         <div style={{ zIndex: 9999 }} className="fixed top-10 left-1/2 -translate-x-1/2 min-w-[300px] animate-bounce">
@@ -117,7 +177,7 @@ function AppShell() {
       )}
 
       {/* GLOBAL CSS FOR PRINT */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(`
         @media print {
           body {
             -webkit-print-color-adjust: exact;
@@ -125,48 +185,138 @@ function AppShell() {
             background-color: white !important;
           }
         }
-      `}} />
+      `) }} />
 
       {/* NAVIGATION */}
-      <nav className={`bg-[#006B3F] dark:bg-[#004d2d] shadow-lg border-b-4 border-[#CE1126] sticky top-0 z-40 print:hidden transition-all duration-300 transform ${showHeader ? 'translate-y-0' : '-translate-y-full'}`}>
+      <nav role="navigation" aria-label="Main navigation" className={`bg-slate-800 dark:bg-slate-900 shadow-lg border-b-2 border-slate-600 dark:border-slate-700 sticky top-0 z-40 print:hidden transition-all duration-300 transform ${showHeader ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="max-w-7xl mx-auto px-4 md:px-8 flex justify-between items-center h-16">
           <div className="flex items-center gap-3">
-            <div className="bg-white p-1 rounded-md shadow-sm flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-6 h-6">
-                <path fill="#006B3F" d="M12 2L3 6v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V6l-9-4z" />
-                <path fill="#CE1126" d="M12 4.5l-7 3.11v4.39c0 4.26 2.95 8.24 7 9.25 4.05-1.01 7-4.99 7-9.25V7.61l-7-3.11z" />
-                <path fill="#FFFFFF" d="M12 15c-1.66 0-3-1-3-2V8.5c1.33 1 2.5 1 3 1s1.67 0 3-1V13c0 1-1.34 2-3 2zm0-2.5c-.83 0-1.5-.5-2-1V9.5c.5.5 1.17.5 2 .5s1.5 0 2-.5v2c-.5.5-1.17 1-2 1z" />
-                <path fill="#FFFFFF" d="M12 12.5c-.5 0-1-.5-1-1.5 0-1.5 1-3 1-3s1 1.5 1 3c0 1-.5 1.5-1 1.5z" />
-              </svg>
-            </div>
-            <span className="text-white font-black text-xl tracking-widest uppercase">Officers Management System</span>
+            {view === 'PROFILE' ? (
+              <button onClick={() => handleNavigation('DATABASE')} className="text-white font-black text-xl tracking-widest uppercase flex items-center gap-2 hover:text-slate-300 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                {formState?.isNew ? 'BAGONG RECORD' : 'DETALYADONG RECORD'}
+              </button>
+            ) : (
+              <>
+                <div className="bg-white p-1 rounded-md shadow-sm flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-6 h-6">
+                    <path fill="#006B3F" d="M12 2L3 6v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V6l-9-4z" />
+                    <path fill="#CE1126" d="M12 4.5l-7 3.11v4.39c0 4.26 2.95 8.24 7 9.25 4.05-1.01 7-4.99 7-9.25V7.61l-7-3.11z" />
+                    <path fill="#FFFFFF" d="M12 15c-1.66 0-3-1-3-2V8.5c1.33 1 2.5 1 3 1s1.67 0 3-1V13c0 1-1.34 2-3 2zm0-2.5c-.83 0-1.5-.5-2-1V9.5c.5.5 1.17.5 2 .5s1.5 0 2-.5v2c-.5.5-1.17 1-2 1z" />
+                    <path fill="#FFFFFF" d="M12 12.5c-.5 0-1-.5-1-1.5 0-1.5 1-3 1-3s1 1.5 1 3c0 1-.5 1.5-1 1.5z" />
+                  </svg>
+                </div>
+                <span className="text-white font-black text-xl tracking-widest uppercase">Officers Management System</span>
+              </>
+            )}
           </div>
 
           <div className="hidden md:flex space-x-2 items-center">
-            <button onClick={() => handleNavigation('DASHBOARD')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'DASHBOARD' ? 'bg-[#004d2d] dark:bg-[#003820] text-white shadow-inner' : 'text-[#e6f4ea] hover:bg-[#005a35] dark:hover:bg-[#003820]'}`}>HOME</button>
-            <button onClick={() => handleNavigation('DATABASE')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${view === 'DATABASE' || view === 'PROFILE' ? 'bg-[#004d2d] dark:bg-[#003820] text-white shadow-inner' : 'text-[#e6f4ea] hover:bg-[#005a35] dark:hover:bg-[#003820]'}`}>
+            <button onClick={() => handleNavigation('DASHBOARD')} aria-label="Navigate to Dashboard" aria-current={view === 'DASHBOARD' ? 'page' : undefined} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'DASHBOARD' ? 'bg-slate-700 dark:bg-slate-800 text-white shadow-inner' : 'text-slate-300 hover:bg-slate-700 dark:hover:bg-slate-800'}`}>HOME</button>
+            <button onClick={() => handleNavigation('DATABASE')} aria-label="Navigate to Officers Database" aria-current={view === 'DATABASE' || view === 'PROFILE' ? 'page' : undefined} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${view === 'DATABASE' || view === 'PROFILE' ? 'bg-slate-700 dark:bg-slate-800 text-white shadow-inner' : 'text-slate-300 hover:bg-slate-700 dark:hover:bg-slate-800'}`}>
               OFFICERS <span className="bg-white/20 text-[10px] px-1.5 py-0.5 rounded-full font-black">{officers.length}</span>
             </button>
-            <button onClick={() => handleNavigation('SETTINGS')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'SETTINGS' ? 'bg-[#004d2d] dark:bg-[#003820] text-white shadow-inner' : 'text-[#e6f4ea] hover:bg-[#005a35] dark:hover:bg-[#003820]'}`}>SETTINGS / BACKUP</button>
-            <button onClick={toggleDarkMode} className="text-white text-xl opacity-70 hover:opacity-100 ml-2 transition-all p-2 rounded-full hover:bg-white/10" title="Toggle Theme">
-              {isDarkMode ? '☀️' : '🌙'}
+            <button onClick={() => handleNavigation('ENCODING')} aria-label="Navigate to Officers Encoding" aria-current={view === 'ENCODING' ? 'page' : undefined} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${view === 'ENCODING' ? 'bg-slate-700 dark:bg-slate-800 text-white shadow-inner' : 'text-slate-300 hover:bg-slate-700 dark:hover:bg-slate-800'}`}>
+              ENCODING
             </button>
+            {/* Admin Profile Dropdown */}
+            <div className="relative ml-2">
+              <button
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                aria-label="Admin menu"
+                aria-expanded={profileDropdownOpen}
+                aria-haspopup="true"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${profileDropdownOpen ? 'bg-slate-700 dark:bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-700 dark:hover:bg-slate-800'}`}
+              >
+                <User className="w-4 h-4" />
+                <span>ADMIN</span>
+              </button>
+              {profileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 py-2 z-50">
+                  <div className="px-4 py-2 border-b border-gray-200 dark:border-slate-700">
+                    <p className="text-sm font-bold text-gray-800 dark:text-white">Administrator</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{new Date().toLocaleDateString()}</p>
+                  </div>
+                  <button
+                    onClick={() => { handleNavigation('SETTINGS'); setProfileDropdownOpen(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    Settings
+                  </button>
+                  <button
+                    onClick={() => { toggleDarkMode(); setProfileDropdownOpen(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
+                  >
+                    {isDarkMode ? (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        Light Mode
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                        Dark Mode
+                      </>
+                    )}
+                  </button>
+                  <div className="border-t border-gray-200 dark:border-slate-700 mt-2 pt-2">
+                    <button
+                      onClick={() => { sessionStorage.removeItem('iligan_auth'); setIsAuthenticated(false); }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+          {/* Mobile hamburger menu */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle mobile menu"
+            aria-expanded={mobileMenuOpen}
+            className="md:hidden text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
-        {/* Mobile nav */}
-        <div className="md:hidden flex bg-[#005a35] px-2 py-2 gap-2 overflow-x-auto">
-          <button onClick={() => handleNavigation('DASHBOARD')} className={`flex-1 py-2 rounded-md text-xs font-bold ${view === 'DASHBOARD' ? 'bg-[#004d2d] text-white' : 'text-[#e6f4ea]'}`}>DASHBOARD</button>
-          <button onClick={() => handleNavigation('DATABASE')} className={`flex-1 py-2 rounded-md text-xs font-bold ${view === 'DATABASE' || view === 'PROFILE' ? 'bg-[#004d2d] text-white' : 'text-[#e6f4ea]'}`}>DATABASE</button>
-          <button onClick={() => handleNavigation('SETTINGS')} className={`flex-1 py-2 rounded-md text-xs font-bold ${view === 'SETTINGS' ? 'bg-[#004d2d] text-white' : 'text-[#e6f4ea]'}`}>SETTINGS</button>
-        </div>
-        <button
-          onClick={() => { sessionStorage.removeItem('iligan_auth'); setIsAuthenticated(false); }}
-          className="fixed top-4 right-4 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg z-[9999]"
-        >Logout</button>
+
+        {/* Mobile slide-out sidebar */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-slate-900 border-t border-slate-700">
+            <div className="px-4 py-3 space-y-2">
+              <button 
+                onClick={() => { handleNavigation('DASHBOARD'); setMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all ${view === 'DASHBOARD' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                DASHBOARD
+              </button>
+              <button 
+                onClick={() => { handleNavigation('DATABASE'); setMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-between ${view === 'DATABASE' || view === 'PROFILE' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                OFFICERS <span className="bg-white/20 text-[10px] px-1.5 py-0.5 rounded-full font-black">{officers.length}</span>
+              </button>
+              <button 
+                onClick={() => { handleNavigation('ENCODING'); setMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all ${view === 'ENCODING' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                ENCODING
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* MAIN CONTENT */}
-      <main className={`print:p-0 print:m-0 print:max-w-none ${view === 'PROFILE' ? 'w-full' : 'p-4 md:p-8 max-w-7xl mx-auto mt-4'}`}>
+      <main role="main" className={`print:p-0 print:m-0 print:max-w-none ${view === 'PROFILE' ? 'w-full' : 'p-4 md:p-8 max-w-7xl mx-auto mt-4'}`}>
 
         {/* DASHBOARD */}
         <div className={view === 'DASHBOARD' ? 'block print:hidden' : 'hidden'}>
@@ -221,6 +371,42 @@ function AppShell() {
               isPatotooView={isPatotooView} setIsPatotooView={setIsPatotooView}
               patotooData={patotooData} setPatotooData={setPatotooData}
               setView={handleNavigation} purokList={purokList}
+              confirmModalState={confirmModalState} setConfirmModalState={setConfirmModalState}
+              departments={departments}
+            />
+          )}
+        </div>
+
+        {/* ENCODING */}
+        <div className={view === 'ENCODING' ? 'block print:hidden' : 'hidden'}>
+          {view === 'ENCODING' && (
+            <OfficersEncodingView
+              handleNavigation={handleNavigation}
+              bulkImportOfficers={bulkImportOfficers}
+              officers={officers}
+              addNewOfficer={() => {
+                setFormState({
+                  id: '',
+                  firstName: '',
+                  lastNameFather: '',
+                  lastNameMother: '',
+                  lastNameSpouse: '',
+                  suffix: '',
+                  gender: '',
+                  birthday: '',
+                  marriageDate: '',
+                  registry: '',
+                  kapisanan: '',
+                  purok: '',
+                  grupo: '',
+                  status: 'ACTIVE',
+                  tungkulinList: [],
+                  dateEncoded: new Date().toISOString(),
+                  isNew: true
+                });
+                setInvalidFields([]);
+                handleNavigation('PROFILE');
+              }}
             />
           )}
         </div>
@@ -237,13 +423,27 @@ function AppShell() {
               debugLog={debugLog} newDeptName={newDeptName} setNewDeptName={setNewDeptName}
               newDeptTarget={newDeptTarget} setNewDeptTarget={setNewDeptTarget}
               addDepartment={addDepartment} departments={departments}
-              updateDeptTarget={updateDeptTarget} deleteDepartment={deleteDepartment}
+              updateDeptTarget={updateDeptTarget} deleteDepartment={deleteDepartment} bulkImportDepartments={bulkImportDepartments}
               newRoleInputs={newRoleInputs} setNewRoleInputs={setNewRoleInputs}
               addSpecificRole={addSpecificRole} removeSpecificRole={removeSpecificRole}
               purokList={purokList} newPurokName={newPurokName} setNewPurokName={setNewPurokName}
               newPurokGroupCount={newPurokGroupCount} setNewPurokGroupCount={setNewPurokGroupCount}
               addPurok={addPurok} deletePurok={deletePurok}
-              bulkImportOfficers={bulkImportOfficers}
+              currentUsername={currentUsername} setCurrentUsername={setCurrentUsername}
+              newUsername={newUsername} setNewUsername={setNewUsername}
+              currentPasswordForAuth={currentPasswordForAuth} setCurrentPasswordForAuth={setCurrentPasswordForAuth}
+              updateUsername={updateUsername} updatePassword={updatePassword}
+              authModalOpen={authModalOpen} setAuthModalOpen={setAuthModalOpen}
+              authModalStep={authModalStep} setAuthModalStep={setAuthModalStep}
+              authModalCurrentPassword={authModalCurrentPassword} setAuthModalCurrentPassword={setAuthModalCurrentPassword}
+              authModalNewUsername={authModalNewUsername} setAuthModalNewUsername={setAuthModalNewUsername}
+              authModalNewPassword={authModalNewPassword} setAuthModalNewPassword={setAuthModalNewPassword}
+              authModalConfirmPassword={authModalConfirmPassword} setAuthModalConfirmPassword={setAuthModalConfirmPassword}
+              openChangeAuthModal={openChangeAuthModal} closeChangeAuthModal={closeChangeAuthModal}
+              verifyCurrentPassword={verifyCurrentPassword} submitAuthChange={submitAuthChange}
+              isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode}
+              autoBackupEnabled={autoBackupEnabled} setAutoBackupEnabled={setAutoBackupEnabled}
+              autoBackupFrequency={autoBackupFrequency} setAutoBackupFrequency={setAutoBackupFrequency}
             />
           )}
         </div>
@@ -270,7 +470,7 @@ function AppShell() {
 
             <div className="text-[12pt] leading-relaxed space-y-6">
               <p>Sa Kinauukulan,</p>
-              <p>Pinatutunayan namin na si kapatid na {formatFullName(formState)} ay masiglang tumutupad ng mga sumusunod na tungkulin:</p>
+              <p>Pinatutunayan namin na si kapatid na {formatFullName(formState, formState.kapisanan)} ay masiglang tumutupad ng mga sumusunod na tungkulin:</p>
               <ul className="pl-12 space-y-2 list-none">
                 {formState.tungkulinList?.filter((t: any) => t.status === 'ACTIVE').map((t: any, i: number) => (
                   <li key={i} className="flex items-center">
@@ -433,7 +633,7 @@ function AppShell() {
                     <tr key={officer.id}>
                       <td className="p-2 border border-black text-[10pt] text-center">{index + 1}</td>
                       <td className="p-2 border border-black text-[10pt] font-mono">{officer.registry || 'N/A'}</td>
-                      <td className="p-2 border border-black text-[10pt] uppercase font-bold">{formatFullName(officer)}</td>
+                      <td className="p-2 border border-black text-[10pt] uppercase font-bold">{formatFullName(officer, officer.kapisanan)}</td>
                       <td className="p-2 border border-black text-[10pt] uppercase">{officer.kapisanan}</td>
                       <td className="p-2 border border-black text-[10pt] uppercase">{officer.purok ? `P${officer.purok}${officer.grupo ? `-G${officer.grupo}` : ''}` : '-'}</td>
                       <td className="p-2 border border-black text-[10pt] uppercase">{displayRoles}</td>

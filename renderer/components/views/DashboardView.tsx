@@ -1,5 +1,5 @@
 
-import { Users, Activity, AlertCircle, CheckCircle2, ChevronRight, AlertTriangle, FileWarning, MapPinOff } from 'lucide-react';
+import { Users, Activity, AlertCircle, CheckCircle2, ChevronRight, AlertTriangle, FileWarning, Plus, FileSpreadsheet, Cake } from 'lucide-react';
 
 interface DeptHealth {
   name: string;
@@ -18,13 +18,16 @@ interface DashData {
   target?: number;
   missingRegistry: number;
   missingPurok: number;
+  missingInfos: number;
   deptHealth: DeptHealth[];
+  birthdaysThisMonth: any[];
+  birthdaysNextMonth: any[];
 }
 
 interface DashboardViewProps {
   dashData: DashData;
   todayDate: string;
-  handleNavigation: (view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS') => void;
+  handleNavigation: (view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING') => void;
   setStatusFilter: (filter: string) => void;
   setSearchQuery: (query: string) => void;
 }
@@ -57,7 +60,7 @@ export default function DashboardView({ dashData, todayDate, handleNavigation, s
       </div>
 
       {/* TOP METRICS GRIDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* TOTAL OFFICERS CARD */}
         <div
           onClick={() => navigateToFilteredDb('ALL')}
@@ -115,6 +118,26 @@ export default function DashboardView({ dashData, todayDate, handleNavigation, s
           <div className="flex flex-col">
             <span className="text-4xl font-black text-[#CE1126] dark:text-red-400">{dashData.inactive}</span>
             <span className="text-xs font-bold text-rose-800 dark:text-rose-500 uppercase tracking-widest mt-1">Inactive Officers</span>
+          </div>
+        </div>
+
+        {/* OFFICERS ENCODING CARD */}
+        <div
+          onClick={() => handleNavigation('ENCODING')}
+          className="group cursor-pointer bg-gradient-to-br from-teal-50 to-cyan-100 dark:from-teal-900/20 dark:to-cyan-900/10 rounded-3xl p-6 shadow-sm border border-teal-200 dark:border-teal-800 hover:shadow-lg transition-all hover:-translate-y-1 relative overflow-hidden"
+        >
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-[#006B3F]">
+            <FileSpreadsheet className="w-32 h-32" />
+          </div>
+          <div className="flex justify-between items-start mb-4">
+            <div className="bg-white/60 dark:bg-teal-900/50 p-3 rounded-2xl backdrop-blur-sm">
+              <Plus className="w-6 h-6 text-[#006B3F] dark:text-teal-400" />
+            </div>
+            <ChevronRight className="w-5 h-5 text-teal-600 dark:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-black text-[#006B3F] dark:text-teal-400">Officers Encoding</span>
+            <span className="text-xs font-bold text-teal-800 dark:text-teal-500 uppercase tracking-widest mt-1">Add Record / Bulk Import</span>
           </div>
         </div>
       </div>
@@ -196,26 +219,25 @@ export default function DashboardView({ dashData, todayDate, handleNavigation, s
         </div>
 
         {/* ACTION REQUIRED COLUMN (RIGHT 1/3) */}
-        <div className="bg-amber-50 dark:bg-yellow-900/10 rounded-3xl p-6 shadow-sm border border-amber-200 dark:border-yellow-700/50 flex flex-col h-full">
-          <div className="flex items-center gap-2 mb-6">
+        <div className="bg-amber-50 dark:bg-yellow-900/10 rounded-3xl p-6 shadow-sm border border-amber-200 dark:border-yellow-700/50 flex flex-col">
+          <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-yellow-500" />
             <h3 className="font-black text-amber-900 dark:text-yellow-500 uppercase tracking-wider text-sm">Action Required</h3>
           </div>
 
-          <div className="space-y-3 flex-1">
+          <div className="space-y-3 mb-6">
 
             {/* Missing Registry */}
             <div
               onClick={() => navigateToFilteredDb('ALL', '!MISSING_REGISTRY')}
-              className="group flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-2xl border border-amber-100 dark:border-yellow-700/30 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5"
+              className="group flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border border-amber-100 dark:border-yellow-700/30 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5"
             >
               <div className="flex items-center gap-3">
                 <div className="bg-amber-100 dark:bg-yellow-900/40 p-2 rounded-full">
                   <FileWarning className="w-4 h-4 text-amber-700 dark:text-yellow-500" />
                 </div>
                 <div>
-                  <span className="block text-sm font-black text-gray-800 dark:text-white">Missing Registry No.</span>
-                  <span className="block text-[10px] font-bold text-gray-500">I-update ang mga records</span>
+                  <span className="block text-sm font-black text-gray-800 dark:text-white">Missing Registry</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -224,26 +246,89 @@ export default function DashboardView({ dashData, todayDate, handleNavigation, s
               </div>
             </div>
 
-            {/* Missing Purok */}
+            {/* Missing Info */}
             <div
-              onClick={() => navigateToFilteredDb('ALL', '!MISSING_PUROK')}
-              className="group flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-2xl border border-amber-100 dark:border-yellow-700/30 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5"
+              onClick={() => navigateToFilteredDb('ALL', '!MISSING_INFOS')}
+              className="group flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-2xl border border-amber-100 dark:border-yellow-700/30 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5"
             >
               <div className="flex items-center gap-3">
                 <div className="bg-amber-100 dark:bg-yellow-900/40 p-2 rounded-full">
-                  <MapPinOff className="w-4 h-4 text-amber-700 dark:text-yellow-500" />
+                  <AlertCircle className="w-4 h-4 text-amber-700 dark:text-yellow-500" />
                 </div>
                 <div>
-                  <span className="block text-sm font-black text-gray-800 dark:text-white">Missing Purok</span>
-                  <span className="block text-[10px] font-bold text-gray-500">Walang naka-assign na Purok</span>
+                  <span className="block text-sm font-black text-gray-800 dark:text-white">Missing Info</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-black text-amber-600 dark:text-yellow-500">{dashData.missingPurok}</span>
+                <span className="text-lg font-black text-amber-600 dark:text-yellow-500">{dashData.missingInfos || 0}</span>
                 <ChevronRight className="w-4 h-4 text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
               </div>
             </div>
 
+          </div>
+
+          {/* BIRTHDAYS SECTION */}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-4">
+              <Cake className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+              <h3 className="font-black text-pink-900 dark:text-pink-500 uppercase tracking-wider text-sm">Birthdays</h3>
+            </div>
+
+            <div className="space-y-3">
+              {/* This Month */}
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-pink-100 dark:border-pink-700/30">
+                <div className="mb-2">
+                  <span className="block text-sm font-black text-gray-800 dark:text-white">This Month</span>
+                  <span className="block text-[10px] font-bold text-gray-500">{new Date().toLocaleDateString('en-US', { month: 'long' })}</span>
+                </div>
+                {dashData.birthdaysThisMonth && dashData.birthdaysThisMonth.length > 0 ? (
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {dashData.birthdaysThisMonth.map((officer: any) => {
+                      const bday = new Date(officer.bday);
+                      const today = new Date();
+                      const age = today.getFullYear() - bday.getFullYear() - ((today.getMonth() < bday.getMonth() || (today.getMonth() === bday.getMonth() && today.getDate() < bday.getDate())) ? 1 : 0);
+                      const birthDateStr = bday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      return (
+                        <div key={officer.id} className="flex justify-between items-center text-xs">
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">{officer.lastNameFather}, {officer.firstName}</span>
+                          <span className="text-pink-600 dark:text-pink-400 font-bold">{birthDateStr} ({age})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-gray-400 italic">No birthdays this month</p>
+                )}
+              </div>
+
+              {/* Next Month */}
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-pink-100 dark:border-pink-700/30">
+                <div className="mb-2">
+                  <span className="block text-sm font-black text-gray-800 dark:text-white">Next Month</span>
+                  <span className="block text-[10px] font-bold text-gray-500">
+                    {new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString('en-US', { month: 'long' })}
+                  </span>
+                </div>
+                {dashData.birthdaysNextMonth && dashData.birthdaysNextMonth.length > 0 ? (
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {dashData.birthdaysNextMonth.map((officer: any) => {
+                      const bday = new Date(officer.bday);
+                      const today = new Date();
+                      const age = today.getFullYear() - bday.getFullYear() - ((today.getMonth() < bday.getMonth() || (today.getMonth() === bday.getMonth() && today.getDate() < bday.getDate())) ? 1 : 0);
+                      const birthDateStr = bday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      return (
+                        <div key={officer.id} className="flex justify-between items-center text-xs">
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">{officer.lastNameFather}, {officer.firstName}</span>
+                          <span className="text-pink-600 dark:text-pink-400 font-bold">{birthDateStr} ({age})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-gray-400 italic">No birthdays next month</p>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="mt-4 pt-4 border-t border-amber-200/50 dark:border-yellow-700/30">

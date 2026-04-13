@@ -1,5 +1,16 @@
-import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
-import { formatFullName } from '../utils';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { formatFullName, validateOfficer } from '../utils';
+
+interface IpcHandler {
+  invoke: (channel: string, data?: any) => Promise<any>;
+  selectFolder: () => Promise<string | null>;
+}
+
+declare global {
+  interface Window {
+    ipc: IpcHandler;
+  }
+}
 
 
 
@@ -32,19 +43,43 @@ interface OMSContextValue {
   isLoaded: boolean;
   isAuthenticated: boolean;
   setIsAuthenticated: (v: boolean) => void;
+  usernameInput: string;
+  setUsernameInput: (v: string) => void;
+  currentUsername: string;
+  setCurrentUsername: (v: string) => void;
   passwordInput: string;
   setPasswordInput: (v: string) => void;
   showPassword: boolean;
   setShowPassword: (v: boolean) => void;
   authError: boolean;
   handleLogin: (e?: React.FormEvent) => void;
+  authModalOpen: boolean;
+  setAuthModalOpen: (v: boolean) => void;
+  authModalStep: 'verify' | 'change';
+  setAuthModalStep: (v: 'verify' | 'change') => void;
+  authModalCurrentPassword: string;
+  setAuthModalCurrentPassword: (v: string) => void;
+  authModalNewUsername: string;
+  setAuthModalNewUsername: (v: string) => void;
+  authModalNewPassword: string;
+  setAuthModalNewPassword: (v: string) => void;
+  authModalConfirmPassword: string;
+  setAuthModalConfirmPassword: (v: string) => void;
+  openChangeAuthModal: () => void;
+  closeChangeAuthModal: () => void;
+  verifyCurrentPassword: () => boolean;
+  submitAuthChange: () => void;
 
   // UI
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   showHeader: boolean;
-  view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS';
-  handleNavigation: (v: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS') => void;
+  view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING';
+  handleNavigation: (v: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING') => void;
+  autoBackupEnabled: boolean;
+  setAutoBackupEnabled: (v: boolean) => void;
+  autoBackupFrequency: number; // in minutes
+  setAutoBackupFrequency: (v: number) => void;
   notification: { show: boolean; message: string; type: string };
   setNotification: (v: any) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
@@ -93,6 +128,7 @@ interface OMSContextValue {
   saveOfficer: () => Promise<void>;
   deleteOfficer: (id: string) => void;
   bulkImportOfficers: (officers: any[]) => void;
+  bulkImportDepartments: (inputText: string) => void;
   handleFormChange: (field: string, value: string) => void;
   handleTungkulinChange: (id: string, field: string, value: string) => void;
   addTungkulinRow: () => void;
@@ -101,6 +137,8 @@ interface OMSContextValue {
   setInvalidFields: (v: any) => void;
   isDirty: boolean;
   setIsDirty: (v: boolean) => void;
+  isLoading: boolean;
+  setIsLoading: (v: boolean) => void;
 
   // Dropdown / autocomplete
   activeDropdown: { id: string; field: string; query?: string } | null;
@@ -160,6 +198,14 @@ interface OMSContextValue {
   setNewPassword: (v: string) => void;
   confirmPassword: string;
   setConfirmPassword: (v: string) => void;
+
+  // Username management
+  newUsername: string;
+  setNewUsername: (v: string) => void;
+  currentPasswordForAuth: string;
+  setCurrentPasswordForAuth: (v: string) => void;
+  updateUsername: () => void;
+  updatePassword: () => void;
 }
 
 // ============================================================
@@ -181,6 +227,8 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   // ── Auth ──────────────────────────────────────────────────
   const [isLoaded, setIsLoaded] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUsername, setCurrentUsername] = useState('');
+  const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState(false);
@@ -201,7 +249,6 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
           if (result.rememberedFolder) setSaveLocation(result.rememberedFolder);
         }
       } catch (err) {
-        console.error('Silent load error:', err);
       } finally {
         setIsLoaded(true);
       }
@@ -229,15 +276,49 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated]);
 
   const handleLogin = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const systemPassword = localStorage.getItem('oms_system_password') || '!005officers01042';
-    if (passwordInput === systemPassword) {
-      sessionStorage.setItem('iligan_auth', 'true');
+    e?.preventDefault();
+    const systemUsername = typeof window !== 'undefined' ? localStorage.getItem('oms_system_username') : null;
+    const systemPassword = typeof window !== 'undefined' ? localStorage.getItem('oms_system_password') : null;
+    const defaultUsername = 'cor.14377';
+    const defaultPassword = 'lan00501042';
+
+    // First-time setup - no credentials exist, allow creation or use defaults
+    if (!systemUsername || !systemPassword) {
+      if (usernameInput === defaultUsername && passwordInput === defaultPassword) {
+        // Use default credentials
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('oms_system_username', defaultUsername);
+          localStorage.setItem('oms_system_password', defaultPassword);
+        }
+        setIsAuthenticated(true);
+        setCurrentUsername(defaultUsername);
+        setAuthError(false);
+        setPasswordInput('');
+        showToast('Logged in with default credentials', 'success');
+      } else if (usernameInput && passwordInput) {
+        // Create custom initial credentials
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('oms_system_username', usernameInput);
+          localStorage.setItem('oms_system_password', passwordInput);
+        }
+        setIsAuthenticated(true);
+        setCurrentUsername(usernameInput);
+        setAuthError(false);
+        setPasswordInput('');
+        showToast('Initial credentials created successfully!', 'success');
+      } else {
+        showToast('Please enter username and password to set up initial credentials', 'error');
+      }
+      return;
+    }
+
+    if (usernameInput === systemUsername && passwordInput === systemPassword) {
       setIsAuthenticated(true);
+      setCurrentUsername(usernameInput);
       setAuthError(false);
+      setPasswordInput('');
     } else {
       setAuthError(true);
-      setPasswordInput('');
     }
   };
 
@@ -248,18 +329,26 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
 
   useEffect(() => {
-    const saved = localStorage.getItem('iligan_theme');
-    if (saved === 'dark') {
-      setIsDarkMode(true);
-      document.documentElement.classList.add('dark');
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('iligan_theme');
+      if (saved === 'dark') {
+        setIsDarkMode(true);
+        if (typeof document !== 'undefined') {
+          document.documentElement.classList.add('dark');
+        }
+      }
     }
   }, []);
 
   const toggleDarkMode = () => {
     const next = !isDarkMode;
     setIsDarkMode(next);
-    localStorage.setItem('iligan_theme', next ? 'dark' : 'light');
-    document.documentElement.classList.toggle('dark', next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('iligan_theme', next ? 'dark' : 'light');
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', next);
+    }
   };
 
   useEffect(() => {
@@ -284,10 +373,38 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Navigation ────────────────────────────────────────────
-  const [view, setView] = useState<'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS'>('DASHBOARD');
+  const [view, setView] = useState<'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING'>('DASHBOARD');
   const [isDirty, setIsDirty] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('oms_auto_backup') === 'true';
+    }
+    return false;
+  });
+  const [autoBackupFrequency, setAutoBackupFrequency] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return parseInt(localStorage.getItem('oms_backup_frequency') || '30', 10);
+    }
+    return 30;
+  });
 
-  const handleNavigation = (newView: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS') => {
+  // Persist auto backup settings
+  const handleSetAutoBackupEnabled = (enabled: boolean) => {
+    setAutoBackupEnabled(enabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('oms_auto_backup', String(enabled));
+    }
+  };
+
+  const handleSetAutoBackupFrequency = (frequency: number) => {
+    setAutoBackupFrequency(frequency);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('oms_backup_frequency', String(frequency));
+    }
+  };
+
+  const handleNavigation = (newView: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING') => {
     if (isDirty) {
       runConfirm('May Mga Hindi Pa Naka-save', 'Sigurado ka ba? Mawawala ang lahat ng iyong ginawang pagbabago.', () => {
         setIsDirty(false);
@@ -304,6 +421,18 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [purokList, setPurokList] = useState<Purok[]>([]);
 
+  // Auto backup effect
+  useEffect(() => {
+    if (!autoBackupEnabled) return;
+
+    const interval = setInterval(() => {
+      downloadBackup();
+      showToast('Auto backup completed', 'success');
+    }, autoBackupFrequency * 60 * 1000); // Convert minutes to milliseconds
+
+    return () => clearInterval(interval);
+  }, [autoBackupEnabled, autoBackupFrequency, officers, departments, purokList]);
+
   // ── Storage ───────────────────────────────────────────────
   const [saveLocation, setSaveLocation] = useState('Documents (Default)');
   const [debugLog, setDebugLog] = useState('System Ready');
@@ -318,20 +447,24 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   const saveToBackend = async (updatedOfficers: any[], updatedDepts: any[], updatedPuroks: any[] = purokList) => {
     try {
       let path = saveLocation;
-      if (path === 'Documents (Default)') path = localStorage.getItem('oms_custom_path') || '';
+      if (path === 'Documents (Default)' && typeof window !== 'undefined') path = localStorage.getItem('oms_custom_path') || '';
       const result = await window.ipc.invoke('save-db', {
         data: { officers: updatedOfficers, departments: updatedDepts, puroks: updatedPuroks },
         customPath: path
       });
-      if (!result?.success) console.error('Save failed:', result?.error);
+      if (!result?.success) showToast('Save failed: ' + (result?.error || 'Unknown error'), 'error');
     } catch (err) {
-      console.error('IPC Error:', err);
+      showToast('IPC communication error', 'error');
     }
   };
 
   const handleFolderPick = async () => {
     try {
-      const folderPath = await window.ipc.selectFolder();
+      if (!window.ipc) {
+        setDebugLog('ERROR: IPC not available. Make sure the app is running in Electron.');
+        return;
+      }
+      const folderPath = await window.ipc.invoke('select-folder');
       if (folderPath) {
         setDebugLog('Folder selected! Loading from: ' + folderPath);
         setSaveLocation(folderPath);
@@ -341,10 +474,11 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
           if (loadResult.data.departments) setDepartments(loadResult.data.departments);
           if (loadResult.data.puroks) setPurokList(loadResult.data.puroks);
           setDebugLog('SUCCESS: Database loaded from ' + folderPath);
-        } else {
+        }
+        if (folderPath) {
           setDebugLog('Folder selected. Will save new database here: ' + folderPath);
         }
-        localStorage.setItem('oms_custom_path', folderPath);
+        if (typeof window !== 'undefined') localStorage.setItem('oms_custom_path', folderPath);
       }
     } catch (err: any) {
       setDebugLog('ERROR: ' + err.message);
@@ -353,12 +487,14 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
 
   const handleLoadDatabase = async () => {
     try {
-      // @ts-ignore
-      const folderPath = await window.ipc.selectFolder();
+      if (!window.ipc) {
+        showToast('❌ System Error: IPC not available.', 'error');
+        return;
+      }
+      const folderPath = await window.ipc.invoke('select-folder');
       if (folderPath) {
         setSaveLocation(folderPath);
-        localStorage.setItem('oms_custom_path', folderPath);
-        // @ts-ignore
+        if (typeof window !== 'undefined') localStorage.setItem('oms_custom_path', folderPath);
         const result = await window.ipc.invoke('load-db', folderPath);
         if (result?.success && result?.data) {
           if (result.data.officers) setOfficers(result.data.officers);
@@ -404,7 +540,7 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
 
   const filteredOfficers = useMemo(() => {
     const filtered = officers.filter(officer => {
-      const fullName = formatFullName(officer).toLowerCase();
+      const fullName = formatFullName(officer, officer.kapisanan).toLowerCase();
       const searchLow = searchQuery.toLowerCase();
 
       let matchesSearch = false;
@@ -412,34 +548,55 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
         matchesSearch = !officer.registry || officer.registry.trim() === '';
       } else if (searchQuery === '!MISSING_PUROK') {
         matchesSearch = !officer.purok || officer.purok.trim() === '';
+      } else if (searchQuery === '!MISSING_INFOS') {
+        // Missing Petsa Nanumpa (active tungkulin without inOathDate)
+        const hasActiveWithoutOathDate = officer.tungkulinList?.some((t: any) => t.status === 'ACTIVE' && (!t.inOathDate || t.inOathDate.trim() === ''));
+        // Missing Petsa Nabawas/OUT (inactive tungkulin without outDropDate)
+        const hasInactiveWithoutDropDate = officer.tungkulinList?.some((t: any) => t.status === 'INACTIVE' && (!t.outDropDate || t.outDropDate.trim() === ''));
+        // Missing Kapisanan
+        const missingKapisanan = !officer.kapisanan || officer.kapisanan.trim() === '';
+        matchesSearch = hasActiveWithoutOathDate || hasInactiveWithoutDropDate || missingKapisanan;
       } else {
-        matchesSearch = fullName.includes(searchLow) || (officer.registry && officer.registry.toLowerCase().includes(searchLow));
+        matchesSearch = fullName.includes(searchLow) || (officer.registry && officer.registry.toLowerCase().includes(searchLow)) || (officer.controlNumber && officer.controlNumber.toLowerCase().includes(searchLow));
       }
 
       const matchesKapisanan = kapisananFilter === 'ALL' || officer.kapisanan === kapisananFilter;
       const matchesPurok = purokFilter === 'ALL' || officer.purok === purokFilter;
       const matchesGrupo = grupoFilter === 'ALL' || officer.grupo === grupoFilter;
 
-      const hasMatchingDutyRow = officer.tungkulinList?.some((t: any) => {
-        if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
-        if (tungkulinFilter !== 'ALL') {
-          const dept = departments.find(d => d.name === tungkulinFilter);
-          const validRoles = dept ? [dept.name, ...(dept.specificRoles || [])] : [tungkulinFilter];
-          if (subRoleFilter !== 'ALL') {
-            if (t.name !== subRoleFilter) return false;
-          } else {
-            if (!validRoles.includes(t.name)) return false;
+      // Only check tungkulin matching if officer has tungkulinList OR if tungkulin/status filters are active
+      const hasMatchingDutyRow = (() => {
+        // If no tungkulin filters and no status filter, any officer matches (including those without tungkulin)
+        if (tungkulinFilter === 'ALL' && statusFilter === 'ALL') return true;
+        
+        // If officer has no tungkulin, they don't match when filters are active
+        if (!officer.tungkulinList || officer.tungkulinList.length === 0) return false;
+        
+        return officer.tungkulinList.some((t: any) => {
+          if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
+          if (tungkulinFilter !== 'ALL') {
+            const dept = departments.find(d => d.name === tungkulinFilter);
+            const validRoles = dept ? [dept.name, ...(dept.specificRoles || [])] : [tungkulinFilter];
+            if (subRoleFilter !== 'ALL') {
+              if (t.name !== subRoleFilter) return false;
+            } else {
+              if (!validRoles.includes(t.name)) return false;
+            }
           }
-        }
-        return true;
-      });
+          return true;
+        });
+      })();
 
       return matchesSearch && matchesKapisanan && matchesPurok && matchesGrupo && hasMatchingDutyRow;
     });
 
     filtered.sort((a, b) => {
       let valA = '', valB = '';
-      if (sortField === 'name') { valA = formatFullName(a); valB = formatFullName(b); }
+      if (sortField === 'name') {
+        // Sort by last name (lastNameFather only)
+        valA = a.lastNameFather || '';
+        valB = b.lastNameFather || '';
+      }
       else if (sortField === 'registry') { valA = a.registry || ''; valB = b.registry || ''; }
       else if (sortField === 'prkGrp') { valA = a.purok || ''; valB = b.purok || ''; }
       else if (sortField === 'kapisanan') { valA = a.kapisanan || ''; valB = b.kapisanan || ''; }
@@ -478,6 +635,44 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
     const missingRegistry = dashOfficers.filter(o => !o.registry || o.registry.trim() === '').length;
     const missingPurok = dashOfficers.filter(o => !o.purok || o.purok.trim() === '').length;
 
+    const missingInfos = dashOfficers.filter(o => {
+      // Missing Petsa Nanumpa (active tungkulin without inOathDate)
+      const hasActiveWithoutOathDate = o.tungkulinList?.some((t: any) => t.status === 'ACTIVE' && (!t.inOathDate || t.inOathDate.trim() === ''));
+      // Missing Petsa Nabawas/OUT (inactive tungkulin without outDropDate)
+      const hasInactiveWithoutDropDate = o.tungkulinList?.some((t: any) => t.status === 'INACTIVE' && (!t.outDropDate || t.outDropDate.trim() === ''));
+      // Missing Kapisanan
+      const missingKapisanan = !o.kapisanan || o.kapisanan.trim() === '';
+
+      return hasActiveWithoutOathDate || hasInactiveWithoutDropDate || missingKapisanan;
+    }).length;
+
+    // Calculate birthdays for this month and next month
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+    const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+
+    const birthdaysThisMonth = dashOfficers.filter(o => {
+      if (!o.bday) return false;
+      const bday = new Date(o.bday);
+      return bday.getMonth() === currentMonth && bday.getDate() >= now.getDate();
+    }).sort((a, b) => {
+      const bdayA = new Date(a.bday);
+      const bdayB = new Date(b.bday);
+      return bdayA.getDate() - bdayB.getDate();
+    });
+
+    const birthdaysNextMonth = dashOfficers.filter(o => {
+      if (!o.bday) return false;
+      const bday = new Date(o.bday);
+      return bday.getMonth() === nextMonth && bday.getFullYear() === nextYear;
+    }).sort((a, b) => {
+      const bdayA = new Date(a.bday);
+      const bdayB = new Date(b.bday);
+      return bdayA.getDate() - bdayB.getDate();
+    });
+
     const deptHealth = departments.map(d => {
       const activeInDept = dashOfficers.filter(o =>
         o.tungkulinList?.some((t: any) => {
@@ -496,7 +691,8 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
       kadiwa: dashOfficers.filter(o => o.kapisanan === 'KADIWA').length,
       binhi: dashOfficers.filter(o => o.kapisanan === 'BINHI').length,
       target: departments.find(d => d.name === targetDept)?.target || 0,
-      missingRegistry, missingPurok, deptHealth
+      missingRegistry, missingPurok, missingInfos, deptHealth,
+      birthdaysThisMonth, birthdaysNextMonth
     };
   }, [officers, tungkulinFilter, view, departments]);
 
@@ -514,6 +710,7 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
     } else {
       setFormState({
         isNew: true,
+        controlNumber: '',
         firstName: '', suffix: '', gender: '',
         lastNameFather: '', lastNameMother: '', lastNameSpouse: '',
         registry: '', kapisanan: '', bday: '', petsaKasal: '', prkGrp: '',
@@ -531,56 +728,72 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveOfficer = async () => {
-    const errors: string[] = [];
-    if (!formState.registry) errors.push('registry');
-    if (!formState.firstName) errors.push('firstName');
-    if (!formState.lastNameFather) errors.push('lastNameFather');
+    try {
+      setIsLoading(true);
+      // Use validation utilities
+      const validation = validateOfficer(formState);
+      if (!validation.valid) {
+        setInvalidFields([]);
+        showToast(validation.errors.join(', '), 'error');
+        return;
+      }
+      setInvalidFields([]);
 
-    if (errors.length > 0) {
-      setInvalidFields(errors);
-      showToast('Pangalan at Registry Number ay kailangan!', 'error');
-      return;
+      const isNew = formState.isNew;
+      const savedForm = { ...formState, lastModified: new Date().toISOString() };
+      let newList: any[];
+
+      if (isNew) {
+        const newObj = { ...savedForm, id: Date.now().toString() };
+        delete newObj.isNew;
+        newList = [...officers, newObj];
+      } else {
+        newList = officers.map(o => o.id === savedForm.id ? savedForm : o);
+      }
+
+      setOfficers(newList);
+
+      let path = saveLocation;
+      if (path === 'Documents (Default)' && typeof window !== 'undefined') path = localStorage.getItem('oms_custom_path') || '';
+      const saveResult = await window.ipc.invoke('save-db', { data: { officers: newList, departments, puroks: purokList }, customPath: path });
+
+      if (!saveResult?.success) {
+        showToast('❌ Save failed: ' + (saveResult?.error || 'Unknown error'), 'error');
+        return;
+      }
+      showToast(isNew ? '✅ Success adding officer!' : '✅ Success! Record saved.');
+      setIsDirty(false);
+      setView('DATABASE');
+    } catch (error) {
+      showToast('Error saving officer record', 'error');
+    } finally {
+      setIsLoading(false);
     }
-    setInvalidFields([]);
-
-    const isNew = formState.isNew;
-    const savedForm = { ...formState, lastModified: new Date().toISOString() };
-    let newList: any[];
-
-    if (isNew) {
-      const newObj = { ...savedForm, id: Date.now().toString() };
-      delete newObj.isNew;
-      newList = [...officers, newObj];
-    } else {
-      newList = officers.map(o => o.id === savedForm.id ? savedForm : o);
-    }
-
-    setOfficers(newList);
-
-    let path = saveLocation;
-    if (path === 'Documents (Default)') path = localStorage.getItem('oms_custom_path') || '';
-    await window.ipc.invoke('save-db', { data: { officers: newList, departments, puroks: purokList }, customPath: path });
-
-    showToast(isNew ? '✅ Success adding officer!' : '✅ Success! Record saved.');
-    setIsDirty(false);
-    setView('DATABASE');
   };
 
   const deleteOfficer = (id: string) => {
     runConfirm('Burahin ang Record', 'Sigurado ka bang gusto mong burahin ang record na ito?', () => {
-      const newList = officers.filter(o => o.id !== id);
-      setOfficers(newList);
-      saveToBackend(newList, departments);
-      setView('DATABASE');
+      try {
+        const newList = officers.filter(o => o.id !== id);
+        setOfficers(newList);
+        saveToBackend(newList, departments);
+        setView('DATABASE');
+      } catch (error) {
+        showToast('Error deleting officer record', 'error');
+      }
     });
   };
 
   const bulkImportOfficers = (importedOfficers: any[]) => {
-    const newList = [...officers, ...importedOfficers];
-    setOfficers(newList);
-    saveToBackend(newList, departments);
-    showToast(`✅ Successfully imported ${importedOfficers.length} officers!`, 'success');
-    setView('DATABASE');
+    try {
+      const newList = [...officers, ...importedOfficers];
+      setOfficers(newList);
+      saveToBackend(newList, departments);
+      showToast(`✅ Successfully imported ${importedOfficers.length} officers!`, 'success');
+      setView('DATABASE');
+    } catch (error) {
+      showToast('Error importing officers', 'error');
+    }
   };
 
   const handleFormChange = (field: string, value: string) => {
@@ -605,7 +818,7 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       tungkulinList: [...prev.tungkulinList, {
         id: Date.now().toString(), name: '', scope: 'PANLOKAL',
-        inOathDate: '', inOathRef: '', inTransferDate: '',
+        inOathDate: '', inOathRef: '', inDate: '', inTransferDate: '',
         outDropDate: '', outDropRef: '', outTransferDate: '',
         status: 'ACTIVE', code: '', inactiveDate: ''
       }]
@@ -699,16 +912,39 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   // ── Print ─────────────────────────────────────────────────
   const [isPrintingMasterlist, setIsPrintingMasterlist] = useState(false);
 
-  const downloadBackup = () => {
-    const data = JSON.stringify({ officers, departments }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `INC_Database_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadBackup = async () => {
+    try {
+      const data = JSON.stringify({ officers, departments, puroks: purokList }, null, 2);
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `INC_Database_Backup_${timestamp}.json`;
+      
+      let backupPath = saveLocation;
+      if (!backupPath || backupPath === 'Documents (Default)') {
+        backupPath = localStorage.getItem('oms_custom_path') || '';
+      }
+      
+      if (window.ipc && backupPath) {
+        const filePath = `${backupPath}/${filename}`;
+        const result = await window.ipc.invoke('save-file', { filePath, data });
+        if (result?.success) {
+          showToast('✅ Backup saved successfully!', 'success');
+          return;
+        }
+      }
+      
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('✅ Backup downloaded to Downloads folder!', 'success');
+    } catch (err: any) {
+      showToast('❌ Backup failed: ' + err.message, 'error');
+    }
   };
 
   // ── Departments ───────────────────────────────────────────
@@ -786,12 +1022,192 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // ── Context Value ─────────────────────────────────────────
+  // ── Username Management ─────────────────────────────────────
+  const [newUsername, setNewUsername] = useState('');
+  const [currentPasswordForAuth, setCurrentPasswordForAuth] = useState('');
+
+  // ── Auth Modal ─────────────────────────────────────────────
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalStep, setAuthModalStep] = useState<'verify' | 'change'>('verify');
+  const [authModalCurrentPassword, setAuthModalCurrentPassword] = useState('');
+  const [authModalNewUsername, setAuthModalNewUsername] = useState('');
+  const [authModalNewPassword, setAuthModalNewPassword] = useState('');
+  const [authModalConfirmPassword, setAuthModalConfirmPassword] = useState('');
+
+  const openChangeAuthModal = () => {
+    setAuthModalOpen(true);
+    setAuthModalStep('verify');
+    setAuthModalCurrentPassword('');
+    setAuthModalNewUsername(currentUsername);
+    setAuthModalNewPassword('');
+    setAuthModalConfirmPassword('');
+  };
+
+  const closeChangeAuthModal = () => {
+    setAuthModalOpen(false);
+    setAuthModalStep('verify');
+    setAuthModalCurrentPassword('');
+    setAuthModalNewUsername('');
+    setAuthModalNewPassword('');
+    setAuthModalConfirmPassword('');
+  };
+
+  const verifyCurrentPassword = (): boolean => {
+    const systemPassword = typeof window !== 'undefined' ? localStorage.getItem('oms_system_password') : null;
+    if (!systemPassword) {
+      showToast('No password set. Please set up credentials first.', 'error');
+      return false;
+    }
+    if (authModalCurrentPassword !== systemPassword) {
+      showToast('Current password is incorrect!', 'error');
+      return false;
+    }
+    setAuthModalStep('change');
+    return true;
+  };
+
+  const submitAuthChange = () => {
+    if (!authModalNewUsername.trim()) {
+      showToast('Username cannot be empty!', 'error');
+      return;
+    }
+    if (!authModalNewPassword) {
+      showToast('Password cannot be empty!', 'error');
+      return;
+    }
+    if (authModalNewPassword !== authModalConfirmPassword) {
+      showToast('Passwords do not match!', 'error');
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('oms_system_username', authModalNewUsername);
+      localStorage.setItem('oms_system_password', authModalNewPassword);
+    }
+    setCurrentUsername(authModalNewUsername);
+    showToast('Username and password updated successfully!', 'success');
+    closeChangeAuthModal();
+  };
+
+  // ── Bulk Import Departments ─────────────────────────────────
+  const bulkImportDepartments = (inputText: string) => {
+    try {
+      const lines = inputText.trim().split('\n');
+      const parsedDepartments: { name: string; target: number; specificRoles: string[] }[] = [];
+      let currentDept: { name: string; target: number; specificRoles: string[] } | null = null;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        // Check if line starts with indentation (sub role)
+        if (trimmed.startsWith('-') || trimmed.startsWith('•') || /^\s+/.test(trimmed)) {
+          const roleName = trimmed.replace(/^[-•]\s*/, '').trim();
+          if (currentDept && roleName) {
+            currentDept.specificRoles.push(roleName);
+          }
+        } else {
+          // New department
+          if (currentDept) {
+            parsedDepartments.push(currentDept);
+          }
+
+          // Check for target in department name
+          let deptName = trimmed;
+          let target = 0;
+          const targetMatch = trimmed.match(/,?\s*Target:\s*(\d+)/i);
+          if (targetMatch) {
+            target = parseInt(targetMatch[1], 10);
+            deptName = trimmed.replace(/,?\s*Target:\s*\d+/i, '').trim();
+          }
+
+          currentDept = { name: deptName, target, specificRoles: [] };
+        }
+      });
+
+      // Add last department
+      if (currentDept) {
+        parsedDepartments.push(currentDept);
+      }
+
+      // Merge with existing departments
+      const existingDepts = [...departments];
+      parsedDepartments.forEach(newDept => {
+        const existingIndex = existingDepts.findIndex(d => d.name.toLowerCase() === newDept.name.toLowerCase());
+        if (existingIndex >= 0) {
+          // Update existing department
+          existingDepts[existingIndex] = {
+            ...existingDepts[existingIndex],
+            target: newDept.target || existingDepts[existingIndex].target,
+            specificRoles: [...new Set([...(existingDepts[existingIndex].specificRoles || []), ...newDept.specificRoles])]
+          };
+        } else {
+          // Add new department
+          existingDepts.push({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            name: newDept.name,
+            target: newDept.target,
+            specificRoles: newDept.specificRoles
+          });
+        }
+      });
+
+      setDepartments(existingDepts);
+      saveToBackend(officers, existingDepts, purokList);
+      showToast(`Successfully imported ${parsedDepartments.length} department(s)!`, 'success');
+    } catch (error) {
+      showToast('Error importing departments', 'error');
+    }
+  };
+
+  const updateUsername = () => {
+    const systemPassword = typeof window !== 'undefined' ? localStorage.getItem('oms_system_password') : null;
+    if (!systemPassword) {
+      showToast('No password set. Please set up credentials first.', 'error');
+      return;
+    }
+    if (currentPasswordForAuth !== systemPassword) {
+      showToast('Current password is incorrect!', 'error');
+      return;
+    }
+    if (!newUsername.trim()) {
+      showToast('Username cannot be empty!', 'error');
+      return;
+    }
+    if (typeof window !== 'undefined') localStorage.setItem('oms_system_username', newUsername);
+    setCurrentUsername(newUsername);
+    setCurrentPasswordForAuth('');
+    showToast('Username updated successfully!');
+  };
+
+  const updatePassword = () => {
+    const systemPassword = typeof window !== 'undefined' ? localStorage.getItem('oms_system_password') : null;
+    if (!systemPassword) {
+      showToast('No password set. Please set up credentials first.', 'error');
+      return;
+    }
+    if (currentPasswordForAuth !== systemPassword) {
+      showToast('Current password is incorrect!', 'error');
+      return;
+    }
+    if (newPassword && newPassword === confirmPassword) {
+      if (typeof window !== 'undefined') localStorage.setItem('oms_system_password', newPassword);
+      showToast('Password updated successfully!');
+      setNewPassword('');
+      setConfirmPassword('');
+      setCurrentPasswordForAuth('');
+    }
+  };
+
   const value: OMSContextValue = {
     isLoaded, isAuthenticated, setIsAuthenticated,
+    usernameInput, setUsernameInput,
+    currentUsername, setCurrentUsername,
     passwordInput, setPasswordInput, showPassword, setShowPassword, authError, handleLogin,
     isDarkMode, toggleDarkMode, showHeader,
     view, handleNavigation,
+    autoBackupEnabled, setAutoBackupEnabled: handleSetAutoBackupEnabled,
+    autoBackupFrequency, setAutoBackupFrequency: handleSetAutoBackupFrequency,
     notification, setNotification, showToast,
     confirmModalState, setConfirmModalState,
     officers, setOfficers,
@@ -808,10 +1224,11 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
     sortField, setSortField,
     sortDirection, setSortDirection,
     formState, setFormState,
-    openProfile, saveOfficer, deleteOfficer, bulkImportOfficers,
+    openProfile, saveOfficer, deleteOfficer, bulkImportOfficers, bulkImportDepartments,
     handleFormChange, handleTungkulinChange, addTungkulinRow, removeTungkulinRow,
     invalidFields, setInvalidFields,
     isDirty, setIsDirty,
+    isLoading, setIsLoading,
     activeDropdown, setActiveDropdown,
     focusedIndex, setFocusedIndex,
     handleKeyDown,
@@ -834,6 +1251,17 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
     addPurok, deletePurok,
     newPassword, setNewPassword,
     confirmPassword, setConfirmPassword,
+    newUsername, setNewUsername,
+    currentPasswordForAuth, setCurrentPasswordForAuth,
+    updateUsername, updatePassword,
+    authModalOpen, setAuthModalOpen,
+    authModalStep, setAuthModalStep,
+    authModalCurrentPassword, setAuthModalCurrentPassword,
+    authModalNewUsername, setAuthModalNewUsername,
+    authModalNewPassword, setAuthModalNewPassword,
+    authModalConfirmPassword, setAuthModalConfirmPassword,
+    openChangeAuthModal, closeChangeAuthModal,
+    verifyCurrentPassword, submitAuthChange,
   };
 
   return <OMSContext.Provider value={value}>{children}</OMSContext.Provider>;

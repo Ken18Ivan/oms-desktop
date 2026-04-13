@@ -1,7 +1,7 @@
 import { app, ipcMain, dialog, Menu, BrowserWindow } from 'electron';
 import serve from 'electron-serve';
 import { createWindow } from './helpers/create-window';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,12 +25,13 @@ if (isProd) {
     width: 1200,
     height: 800,
     title: "OMS Portal",
-    icon: path.join(__dirname, '../resources/logo.ico'), 
+    icon: path.join(__dirname, '../resources/logo.ico'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      webSecurity: true,
     },
   });
 
@@ -50,50 +51,79 @@ app.on('window-all-closed', () => {
 const configPath = path.join(app.getPath('userData'), 'oms-config.json');
 
 // Helpers
-const getRememberedPath = () => {
-  if (fs.existsSync(configPath)) {
-    const data = fs.readFileSync(configPath, 'utf-8');
-    return JSON.parse(data).savedFolder;
+const getRememberedPath = async () => {
+  try {
+    if (await fs.access(configPath).then(() => true).catch(() => false)) {
+      const data = await fs.readFile(configPath, 'utf-8');
+      return JSON.parse(data).savedFolder;
+    }
+  } catch (error) {
+    // File doesn't exist or can't be read
   }
   return null;
 };
 
-const setRememberedPath = (folderPath: string) => {
-  fs.writeFileSync(configPath, JSON.stringify({ savedFolder: folderPath }));
+const setRememberedPath = async (folderPath: string) => {
+  await fs.writeFile(configPath, JSON.stringify({ savedFolder: folderPath }));
 };
 
-// IPC Handlers unchanged...
-ipcMain.handle('save-db', async (event, { data, customPath }) => {
-  try {
-    if (customPath) {
-      setRememberedPath(customPath);
-    }
-    
-    const folder = customPath || getRememberedPath() || app.getPath('documents');
-    const fullPath = path.join(folder, 'inc-officer-db.json');
+// Save queue to prevent race conditions
+let saveQueue = Promise.resolve();
 
-    fs.writeFileSync(fullPath, JSON.stringify(data, null, 2), 'utf-8');
-    return { success: true, savedAt: fullPath };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+const queueSave = async (saveFn: () => Promise<any>) => {
+  saveQueue = saveQueue.then(async () => {
+    return await saveFn();
+  });
+  return saveQueue;
+};
+
+// IPC Handlers
+ipcMain.handle('save-db', async (event, { data, customPath }) => {
+  return queueSave(async () => {
+    try {
+      if (customPath) {
+        await setRememberedPath(path.resolve(customPath));
+      }
+
+      const folder = customPath ? path.resolve(customPath) : await getRememberedPath() || app.getPath('documents');
+      const fullPath = path.join(folder, 'inc-officer-db.json');
+      const tempPath = path.join(folder, `inc-officer-db.json.tmp.${Date.now()}`);
+
+      // Validate folder exists
+      try {
+        await fs.access(folder);
+      } catch {
+        // Folder doesn't exist, try to create it
+        await fs.mkdir(folder, { recursive: true });
+      }
+
+      // Atomic write: write to temp file first, then rename to final destination
+      await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
+      await fs.rename(tempPath, fullPath);
+
+      return { success: true, savedAt: fullPath };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
 });
 
 ipcMain.handle('load-db', async (event, overridePath?: string) => {
   try {
     if (overridePath) {
-      setRememberedPath(overridePath);
+      await setRememberedPath(overridePath);
     }
 
-    const folder = overridePath || getRememberedPath() || app.getPath('documents');
+    const folder = overridePath || await getRememberedPath() || app.getPath('documents');
     const fullPath = path.join(folder, 'inc-officer-db.json');
-    
-    if (fs.existsSync(fullPath)) {
-      const rawData = fs.readFileSync(fullPath, 'utf8');
+
+    try {
+      await fs.access(fullPath);
+      const rawData = await fs.readFile(fullPath, 'utf8');
       return { success: true, data: JSON.parse(rawData), rememberedFolder: folder };
+    } catch {
+      return { success: false, message: "No database file found" };
     }
-    
-    return { success: false, message: "No database file found" };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -120,7 +150,8 @@ ipcMain.handle('print-to-pdf', async (event, { html, filename }) => {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        sandbox: true
+        sandbox: false,
+        webSecurity: true
       }
     });
 
@@ -135,7 +166,7 @@ ipcMain.handle('print-to-pdf', async (event, { html, filename }) => {
       printBackground: true
     });
 
-    fs.writeFileSync(filePath, pdfData);
+    await fs.writeFile(filePath, pdfData);
     
     printWindow.destroy();
 
@@ -166,7 +197,8 @@ ipcMain.handle('save-pdf-dialog', async (event, { html, filename, defaultPath })
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        sandbox: true
+        sandbox: false,
+        webSecurity: true
       }
     });
 
@@ -181,7 +213,7 @@ ipcMain.handle('save-pdf-dialog', async (event, { html, filename, defaultPath })
       printBackground: true
     });
 
-    fs.writeFileSync(filePath, pdfData);
+    await fs.writeFile(filePath, pdfData);
     
     printWindow.destroy();
 
@@ -189,4 +221,36 @@ ipcMain.handle('save-pdf-dialog', async (event, { html, filename, defaultPath })
   } catch (error: any) {
     return { success: false, error: error.message };
   }
+});
+
+// Save file to a specified path
+ipcMain.handle('save-file', async (event, { filePath, data }) => {
+  try {
+    // Create folder if it doesn't exist
+    const folder = path.dirname(filePath);
+    try {
+      await fs.access(folder);
+    } catch {
+      await fs.mkdir(folder, { recursive: true });
+    }
+
+    // Write the file
+    await fs.writeFile(filePath, data, 'utf-8');
+    return { success: true, filePath };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Select folder with dialog
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+    title: 'Select Database Storage Location'
+  });
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+  return null;
 });

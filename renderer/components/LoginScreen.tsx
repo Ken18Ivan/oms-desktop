@@ -1,6 +1,8 @@
 import React from 'react';
 
 interface LoginScreenProps {
+  usernameInput: string;
+  setUsernameInput: (val: string) => void;
   passwordInput: string;
   setPasswordInput: (val: string) => void;
   showPassword: boolean;
@@ -10,6 +12,8 @@ interface LoginScreenProps {
 }
 
 export default function LoginScreen({
+  usernameInput,
+  setUsernameInput,
   passwordInput,
   setPasswordInput,
   showPassword,
@@ -46,8 +50,19 @@ export default function LoginScreen({
           <div className="relative group flex items-center justify-center flex-col">
             <div className="relative w-full">
               <input
-                type={showPassword ? "text" : "password"}
+                type="text"
                 autoFocus
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                placeholder="ENTER USERNAME"
+                className={`w-full px-6 py-4 rounded-xl bg-black/20 border border-white/10 text-white placeholder-white/30 font-bold tracking-[0.1em] text-center focus:outline-none focus:ring-2 focus:ring-[#006B3F]/70 focus:bg-black/40 transition-all duration-300 ${authError ? 'border-red-500 animate-shake bg-red-500/20' : ''}`}
+              />
+            </div>
+          </div>
+          <div className="relative group flex items-center justify-center flex-col">
+            <div className="relative w-full">
+              <input
+                type={showPassword ? "text" : "password"}
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 placeholder="ENTER PASSWORD"

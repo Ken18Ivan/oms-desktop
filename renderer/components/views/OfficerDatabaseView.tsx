@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { formatFullName } from '../../utils';
 import * as XLSX from 'xlsx';
 
@@ -88,10 +89,34 @@ export default function OfficerDatabaseView({
   const [previewTab, setPreviewTab] = useState<'pdf' | 'excel'>('pdf');
   const [isExporting, setIsExporting] = useState(false);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
+  const [showFilterPresets, setShowFilterPresets] = useState(false);
+  const [filterPresets, setFilterPresets] = useState<{name: string, filters: any}[]>([]);
+  const [newPresetName, setNewPresetName] = useState('');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [visibleColumns, setVisibleColumns] = useState({
+    registry: true,
+    controlNumber: true,
+    name: true,
+    kapisanan: true,
+    purok: true,
+    tungkulin: true,
+    actions: true
+  });
+  const [exportVisibleColumns, setExportVisibleColumns] = useState({
+    blg: true,
+    registry: true,
+    controlNumber: true,
+    pangalan: true,
+    kapisanan: true,
+    purokGrupo: true,
+    tungkulin: true,
+    cell: true
+  });
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -107,6 +132,38 @@ export default function OfficerDatabaseView({
     return undefined;
   }, [notification]);
 
+  // Keyboard navigation support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+N - New Record
+      if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        openProfile();
+      }
+      // Ctrl+E - Export
+      if (e.ctrlKey && e.key === 'e') {
+        e.preventDefault();
+        setShowExportModal(true);
+      }
+      // Ctrl+F - Focus Search
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+        if (searchInput) searchInput.focus();
+      }
+      // Escape - Close modals/menus
+      if (e.key === 'Escape') {
+        setShowColumnMenu(false);
+        setShowFilterPresets(false);
+        setShowExportModal(false);
+        setShowPreview(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openProfile]);
+
   const totalPages = Math.ceil(filteredOfficers.length / itemsPerPage);
   
   const paginatedOfficers = useMemo(() => {
@@ -119,7 +176,7 @@ export default function OfficerDatabaseView({
   const generateMasterlistHTML = () => {
     const sheetData = filteredOfficers.map((officer, index) => {
       let displayRoles = '';
-      let displayStatus = 'N/A';
+      let displayCell = 'N/A';
       const validRoles = officer.tungkulinList?.filter((t: any) => t.name.trim() !== '') || [];
 
       if (tungkulinFilter !== 'ALL') {
@@ -131,26 +188,62 @@ export default function OfficerDatabaseView({
         });
         if (matchingRole) {
           displayRoles = matchingRole.name;
-          displayStatus = matchingRole.status;
         }
       } else {
-        displayRoles = validRoles.map((t: any) => t.name).join(', ') || 'N/A';
-        const isAnyActive = validRoles.some((t: any) => t.status === 'ACTIVE');
-        displayStatus = validRoles.length ? (isAnyActive ? 'ACTIVE' : 'INACTIVE') : 'N/A';
+        displayRoles = validRoles.map((t: any) => t.name).join('<br>') || 'N/A';
       }
+
+      displayCell = officer.cellphone || 'N/A';
 
       return {
         blg: index + 1,
         registry: officer.registry || 'N/A',
-        pangalan: formatFullName(officer),
+        controlNumber: (officer.controlNumber || '').padStart(4, '0') || '-',
+        pangalan: formatFullName(officer, officer.kapisanan),
         kapisanan: officer.kapisanan || '',
         purokGrupo: officer.purok ? `${officer.purok}${officer.grupo ? ` - ${officer.grupo}` : ''}` : '-',
         tungkulin: displayRoles,
-        status: displayStatus,
+        status: displayCell,
       };
     });
 
-    const deptName = tungkulinFilter !== 'ALL' ? (subRoleFilter !== 'ALL' ? subRoleFilter : tungkulinFilter) : 'PANGKALAHATAN (ALL DEPARTMENTS)';
+    // Build table headers based on visible columns
+    const tableHeaders = [];
+    if (exportVisibleColumns.blg) tableHeaders.push('<th class="text-center" style="width: 40px;">Blg.</th>');
+    if (exportVisibleColumns.registry) tableHeaders.push('<th style="width: 120px;">Registry No.</th>');
+    if (exportVisibleColumns.controlNumber) tableHeaders.push('<th style="width: 80px;">Control No.</th>');
+    if (exportVisibleColumns.pangalan) tableHeaders.push('<th>Pangalan</th>');
+    if (exportVisibleColumns.kapisanan) tableHeaders.push('<th style="width: 100px;">Kapisanan</th>');
+    if (exportVisibleColumns.purokGrupo) tableHeaders.push('<th style="width: 80px;">Purok-Grupo</th>');
+    if (exportVisibleColumns.tungkulin) tableHeaders.push('<th>Tungkulin</th>');
+    if (exportVisibleColumns.cell) tableHeaders.push('<th class="text-center" style="width: 80px;">Cell #</th>');
+
+    // Build table rows based on visible columns
+    const tableRows = sheetData.map(row => {
+      const cells = [];
+      if (exportVisibleColumns.blg) cells.push(`<td class="text-center font-bold">${row.blg}</td>`);
+      if (exportVisibleColumns.registry) cells.push(`<td class="font-bold">${row.registry}</td>`);
+      if (exportVisibleColumns.controlNumber) cells.push(`<td class="text-center font-bold">${row.controlNumber || 'N/A'}</td>`);
+      if (exportVisibleColumns.pangalan) cells.push(`<td>${row.pangalan}</td>`);
+      if (exportVisibleColumns.kapisanan) cells.push(`<td class="text-center">${row.kapisanan}</td>`);
+      if (exportVisibleColumns.purokGrupo) cells.push(`<td class="text-center">${row.purokGrupo}</td>`);
+      if (exportVisibleColumns.tungkulin) cells.push(`<td>${row.tungkulin}</td>`);
+      if (exportVisibleColumns.cell) cells.push(`<td class="text-center font-bold">${row.status}</td>`);
+      return `<tr>${cells.join('')}</tr>`;
+    }).join('');
+
+    // Build filter description for export header
+    let filterName = '';
+    if (tungkulinFilter !== 'ALL') {
+      filterName = subRoleFilter !== 'ALL' ? subRoleFilter : tungkulinFilter;
+    } else if (kapisananFilter !== 'ALL') {
+      filterName = `Kapisanang ${kapisananFilter}`;
+    } else if (purokFilter !== 'ALL') {
+      filterName = grupoFilter !== 'ALL' ? `Purok ${purokFilter} - Grupo ${grupoFilter}` : `Purok ${purokFilter}`;
+    } else {
+      filterName = '(LAHAT NG DEPARTMENTS)';
+    }
+    const deptName = filterName;
 
     return `<!DOCTYPE html>
       <html>
@@ -180,27 +273,11 @@ export default function OfficerDatabaseView({
         <table>
           <thead>
             <tr>
-              <th class="text-center" style="width: 40px;">Blg.</th>
-              <th style="width: 120px;">Registry No.</th>
-              <th>Pangalan</th>
-              <th style="width: 100px;">Kapisanan</th>
-              <th style="width: 80px;">Purok-Grupo</th>
-              <th>Tungkulin</th>
-              <th class="text-center" style="width: 80px;">Status</th>
+              ${tableHeaders.join('')}
             </tr>
           </thead>
           <tbody>
-            ${sheetData.map(row => `
-              <tr>
-                <td class="text-center font-bold">${row.blg}</td>
-                <td class="font-bold">${row.registry}</td>
-                <td>${row.pangalan}</td>
-                <td class="text-center">${row.kapisanan}</td>
-                <td class="text-center">${row.purokGrupo}</td>
-                <td>${row.tungkulin}</td>
-                <td class="text-center font-bold">${row.status}</td>
-              </tr>
-            `).join('')}
+            ${tableRows}
           </tbody>
         </table>
       </body>
@@ -215,8 +292,8 @@ export default function OfficerDatabaseView({
       const dept = tungkulinFilter !== 'ALL' ? tungkulinFilter : 'ALL_DEPARTMENTS';
       const filename = `Masterlist_${dept}_${new Date().toISOString().split('T')[0]}`;
 
-      if (typeof window !== 'undefined' && (window as any).ipc) {
-        const result = await (window as any).ipc.invoke('save-pdf-dialog', {
+      if (typeof window !== 'undefined' && window.ipc) {
+        const result = await window.ipc.invoke('save-pdf-dialog', {
           html: htmlContent,
           filename: filename,
           defaultPath: filename + '.pdf'
@@ -231,7 +308,6 @@ export default function OfficerDatabaseView({
         }
       }
     } catch (error) {
-      console.error('Export error:', error);
       setNotification({ message: 'Error exporting PDF', type: 'error' });
     } finally {
       setIsExporting(false);
@@ -267,7 +343,8 @@ export default function OfficerDatabaseView({
         return {
           'Blg.': index + 1,
           'Registry No.': officer.registry || 'N/A',
-          'Pangalan': formatFullName(officer),
+          'Control No.': (officer.controlNumber || '').padStart(4, '0') || '-',
+          'Pangalan': formatFullName(officer, officer.kapisanan),
           'Kapisanan': officer.kapisanan || '',
           'Purok-Grupo': officer.purok ? `${officer.purok}${officer.grupo ? ` - ${officer.grupo}` : ''}` : '-',
           'Tungkulin': displayRoles,
@@ -287,7 +364,6 @@ export default function OfficerDatabaseView({
       setShowPreview(false);
       setShowExportModal(false);
     } catch (error) {
-      console.error('Export error:', error);
       setNotification({ message: 'Error exporting Excel', type: 'error' });
     } finally {
       setIsExporting(false);
@@ -308,7 +384,7 @@ export default function OfficerDatabaseView({
 
   const getSortIcon = (field: string) => {
     if (sortField !== field) return '';
-    return sortDirection === 'asc' ? ' ▲' : ' ▼';
+    return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
   return (
@@ -325,18 +401,35 @@ export default function OfficerDatabaseView({
         <div className="mt-4 md:mt-0 flex gap-3">
           <button
             onClick={() => setShowExportModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all text-sm uppercase font-black"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all text-sm uppercase font-black flex items-center gap-2"
           >
-            Preview (PDF/Excel)
-          </button>
-          <button
-            onClick={() => openProfile()}
-            className="bg-[#006B3F] hover:bg-[#004d2d] text-white font-black py-3 px-6 rounded-lg shadow-lg transition-all text-sm flex items-center gap-2"
-          >
-            + NEW RECORD
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download
           </button>
         </div>
       </div>
+
+      {/* Column Visibility Menu */}
+      {showColumnMenu && (
+        <div className="absolute z-50 right-4 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 p-4 w-64">
+          <h4 className="text-sm font-black text-gray-800 dark:text-white uppercase mb-3 border-b border-gray-200 dark:border-slate-700 pb-2">Show Columns</h4>
+          <div className="space-y-2">
+            {Object.entries(visibleColumns).map(([key, value]) => (
+              <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 p-2 rounded-lg transition-colors">
+                <input
+                  type="checkbox"
+                  checked={value}
+                  onChange={(e) => setVisibleColumns({...visibleColumns, [key]: e.target.checked})}
+                  className="w-4 h-4 rounded border-gray-300 text-slate-600 focus:ring-slate-500"
+                />
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">{key}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       {tungkulinFilter !== 'ALL' && (
         <div className="bg-[#fffdf0] dark:bg-yellow-900/10 p-6 shadow-md rounded-2xl mb-6 border-b-4 border-yellow-400 border-x border-t border-gray-200 dark:border-slate-700 transition-colors">
@@ -351,7 +444,7 @@ export default function OfficerDatabaseView({
             <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-600 shadow-sm">
               <div className="text-center w-full">
                 <span className="block text-xs font-bold text-gray-500 uppercase">Total MT</span>
-                <span className="font-black text-3xl text-[#006B3F] dark:text-green-400">{dashData.total}</span>
+                <span className="font-black text-3xl text-slate-700 dark:text-slate-300">{dashData.total}</span>
               </div>
               {subRoleFilter === 'ALL' && (
                 <>
@@ -362,8 +455,8 @@ export default function OfficerDatabaseView({
                   </div>
                   <div className="w-px h-12 bg-gray-200 dark:bg-slate-600"></div>
                   <div className="text-center w-full">
-                    <span className="block text-xs font-bold text-[#CE1126] dark:text-red-500 uppercase">Kulang</span>
-                    <span className="font-black text-3xl text-[#CE1126] dark:text-red-500">
+                    <span className="block text-xs font-bold text-rose-700 dark:text-rose-500 uppercase">Kulang</span>
+                    <span className="font-black text-3xl text-rose-700 dark:text-rose-500">
                       {Math.max(0, (dashData.target || 0) - dashData.total)}
                     </span>
                   </div>
@@ -374,12 +467,12 @@ export default function OfficerDatabaseView({
             <div className="grid grid-cols-5 gap-2">
               <div className="col-span-2 bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-200 dark:border-slate-600 shadow-sm flex justify-around items-center">
                 <div className="text-center">
-                  <span className="block text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">Active</span>
-                  <span className="font-black text-xl text-green-700 dark:text-green-400">{dashData.active}</span>
+                  <span className="block text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase">Active</span>
+                  <span className="font-black text-xl text-emerald-700 dark:text-emerald-400">{dashData.active}</span>
                 </div>
                 <div className="text-center">
-                  <span className="block text-[10px] font-bold text-red-700 dark:text-red-400 uppercase">Inactive</span>
-                  <span className="font-black text-xl text-[#CE1126] dark:text-red-500">{dashData.inactive}</span>
+                  <span className="block text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase">Inactive</span>
+                  <span className="font-black text-xl text-rose-700 dark:text-rose-400">{dashData.inactive}</span>
                 </div>
               </div>
               <div className="col-span-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-200 dark:border-slate-600 shadow-sm flex justify-around items-center">
@@ -401,6 +494,103 @@ export default function OfficerDatabaseView({
         </div>
       )}
 
+      {/* FILTER PRESETS TOGGLE */}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setShowColumnMenu(!showColumnMenu)}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+        >
+          Columns
+        </button>
+        <button
+          onClick={() => setShowFilterPresets(!showFilterPresets)}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-all"
+        >
+          Save/Load Presets
+          {filterPresets.length > 0 && (
+            <select
+              onChange={(e) => {
+                const preset = filterPresets.find(p => p.name === e.target.value);
+                if (preset) {
+                  setSearchQuery(preset.filters.searchQuery);
+                  setTungkulinFilter(preset.filters.tungkulinFilter);
+                  setSubRoleFilter(preset.filters.subRoleFilter);
+                  setKapisananFilter(preset.filters.kapisananFilter);
+                  setStatusFilter(preset.filters.statusFilter);
+                  setPurokFilter(preset.filters.purokFilter);
+                  setGrupoFilter(preset.filters.grupoFilter);
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600"
+            >
+              <option value="">Load Preset...</option>
+              {filterPresets.map(preset => (
+                <option key={preset.name} value={preset.name}>{preset.name}</option>
+              ))}
+            </select>
+          )}
+        </button>
+      </div>
+
+      {/* FILTER PRESETS MENU */}
+      {showFilterPresets && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl shadow-sm border border-blue-200 dark:border-blue-800">
+          <h4 className="text-sm font-black text-blue-900 dark:text-blue-400 uppercase mb-3">Save Current Filter as Preset</h4>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+              placeholder="Preset name..."
+              className="flex-1 px-3 py-2 rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-900 text-sm"
+            />
+            <button
+              onClick={() => {
+                if (newPresetName.trim()) {
+                  const newPreset = {
+                    name: newPresetName,
+                    filters: {
+                      searchQuery,
+                      tungkulinFilter,
+                      subRoleFilter,
+                      kapisananFilter,
+                      statusFilter,
+                      purokFilter,
+                      grupoFilter
+                    }
+                  };
+                  setFilterPresets([...filterPresets, newPreset]);
+                  setNewPresetName('');
+                  setShowFilterPresets(false);
+                  if (showToast) showToast('Filter preset saved!', 'success');
+                }
+              }}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold"
+            >
+              Save
+            </button>
+          </div>
+          {filterPresets.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-700">
+              <h5 className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase mb-2">Saved Presets:</h5>
+              <div className="flex flex-wrap gap-2">
+                {filterPresets.map((preset, index) => (
+                  <div key={preset.name} className="flex items-center gap-1 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{preset.name}</span>
+                    <button
+                      onClick={() => setFilterPresets(filterPresets.filter((_, i) => i !== index))}
+                      className="text-red-500 hover:text-red-700 text-xs ml-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* FILTERS BAR */}
       <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 flex flex-wrap lg:flex-nowrap gap-4 items-end transition-colors">
         <div className="flex-1 min-w-[200px]">
@@ -409,7 +599,7 @@ export default function OfficerDatabaseView({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
-            className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 rounded-lg p-3 focus:ring-2 focus:ring-[#006B3F] outline-none transition-all uppercase text-gray-900 dark:text-white"
+            className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 rounded-lg p-3 focus:ring-2 focus:ring-slate-500 outline-none transition-all uppercase text-gray-900 dark:text-white"
           />
         </div>
 
@@ -421,7 +611,7 @@ export default function OfficerDatabaseView({
               setTungkulinFilter(e.target.value);
               setSubRoleFilter('ALL');
             }}
-            className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none bg-white dark:bg-slate-900 focus:ring-2 focus:ring-[#006B3F] font-bold text-[#006B3F] dark:text-green-400"
+            className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none bg-white dark:bg-slate-900 focus:ring-2 focus:ring-slate-500 font-bold text-slate-700 dark:text-slate-300"
           >
             <option value="ALL">LAHAT (ALL)</option>
             {departments.map((t) => (
@@ -526,7 +716,7 @@ export default function OfficerDatabaseView({
           </button>
           <button
             onClick={deleteSelected}
-            className="bg-[#CE1126] hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors text-sm flex items-center gap-2"
+            className="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors text-sm flex items-center gap-2"
           >
             🗑️ Delete Selected
           </button>
@@ -534,104 +724,210 @@ export default function OfficerDatabaseView({
       )}
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md border border-gray-200 dark:border-slate-700 overflow-hidden transition-colors">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[600px]">
           <table className="w-full text-left border-collapse min-w-[900px]">
-            <thead>
-              <tr className="bg-[#f8fafc] dark:bg-slate-900/50 text-xs text-[#006B3F] dark:text-green-400 uppercase tracking-wider border-b-2 border-gray-200 dark:border-slate-700">
-                <th className="p-4 w-12 text-center" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={filteredOfficers.length > 0 && selectedOfficers.length === filteredOfficers.length}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 cursor-pointer accent-[#006B3F]"
-                  />
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-slate-50 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider border-b-2 border-gray-200 dark:border-slate-700">
+                <th className="p-3 w-10">
+                  <button
+                    onClick={() => {
+                      if (expandedRows.size === paginatedOfficers.length) {
+                        setExpandedRows(new Set());
+                      } else {
+                        setExpandedRows(new Set(paginatedOfficers.map(o => o.id)));
+                      }
+                    }}
+                    className="text-xs font-bold text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                    title={expandedRows.size === paginatedOfficers.length ? "Collapse All" : "Expand All"}
+                  >
+                    {expandedRows.size === paginatedOfficers.length ? '−' : '+'}
+                  </button>
                 </th>
-                <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('registry')}>
-                  Registry No. {getSortIcon('registry')}
-                </th>
-                <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('name')}>
-                  Buong Pangalan {getSortIcon('name')}
-                </th>
-                <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('kapisanan')}>
-                  Kapisanan {getSortIcon('kapisanan')}
-                </th>
-                <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('prkGrp')}>
-                  Purok-Grp {getSortIcon('prkGrp')}
-                </th>
-                <th className="p-4 font-black">Mga Tungkulin</th>
-                <th className="p-4 font-black text-center">Status</th>
+                {visibleColumns.actions && (
+                  <th className="p-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedOfficers.length === paginatedOfficers.length && paginatedOfficers.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 cursor-pointer accent-slate-600"
+                    />
+                  </th>
+                )}
+                {visibleColumns.registry && (
+                  <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('registry')}>
+                    Registry No. {getSortIcon('registry')}
+                  </th>
+                )}
+                {visibleColumns.name && (
+                  <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('name')}>
+                    Buong Pangalan {getSortIcon('name')}
+                  </th>
+                )}
+                {visibleColumns.kapisanan && (
+                  <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('kapisanan')}>
+                    Kapisanan {getSortIcon('kapisanan')}
+                  </th>
+                )}
+                {visibleColumns.purok && (
+                  <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('prkGrp')}>
+                    Purok-Grp {getSortIcon('prkGrp')}
+                  </th>
+                )}
+                {visibleColumns.tungkulin && (
+                  <th className="p-4 font-black">Mga Tungkulin</th>
+                )}
+                {visibleColumns.actions && (
+                  <th className="p-4 font-black text-center">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-slate-700/50">
               {filteredOfficers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-16 text-center text-gray-400 dark:text-gray-500 font-bold text-lg bg-gray-50 dark:bg-slate-900">
-                    Walang record na nahanap.
+                  <td colSpan={Object.values(visibleColumns).filter(Boolean).length} className="p-16">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <div className="w-24 h-24 mb-6 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-xl font-black text-gray-700 dark:text-gray-300 uppercase mb-2">Walang record na nahanap</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Subukang baguhin ang inyong mga filter o magdagdag ng bagong record.
+                      </p>
+                      <button
+                        onClick={() => openProfile()}
+                        className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 px-6 rounded-lg transition-colors text-sm uppercase"
+                      >
+                        + Magdagdag ng Record
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                paginatedOfficers.map((officer) => {
-                  let displayRoles = '';
-                  let displayStatus = 'N/A';
+                filteredOfficers.map((officer, index) => {
                   const validRoles = officer.tungkulinList?.filter((t: any) => t.name.trim() !== '') || [];
-
-                  if (tungkulinFilter !== 'ALL') {
-                    const dept = departments.find((d) => d.name === tungkulinFilter);
-                    const validRolesForDept = dept ? [dept.name, ...(dept.specificRoles || [])] : [tungkulinFilter];
-                    const matchingRole = validRoles.find((t: any) => {
-                      if (subRoleFilter !== 'ALL') return t.name === subRoleFilter;
-                      return validRolesForDept.includes(t.name);
-                    });
-                    if (matchingRole) {
-                      displayRoles = matchingRole.name;
-                      displayStatus = matchingRole.status;
-                    }
-                  } else {
-                    displayRoles = validRoles.map((t: any) => t.name).join(', ') || 'N/A';
-                    const isAnyActive = validRoles.some((t: any) => t.status === 'ACTIVE');
-                    displayStatus = validRoles.length ? (isAnyActive ? 'ACTIVE' : 'INACTIVE') : 'N/A';
-                  }
                   const isSelected = selectedOfficers.includes(officer.id);
+                  const isExpanded = expandedRows.has(officer.id);
                   return (
-                    <tr
-                      key={officer.id}
-                      onClick={() => openProfile(officer)}
-                      className={`hover:bg-[#f0fdf4] dark:hover:bg-slate-700/50 cursor-pointer transition-colors group ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                    >
-                      <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => toggleSelectOfficer(officer.id, e)}
-                          className="w-4 h-4 cursor-pointer accent-[#006B3F]"
-                        />
-                      </td>
-                      <td className="p-4 font-mono text-xs text-gray-500 dark:text-gray-400 font-semibold group-hover:text-[#006B3F] dark:group-hover:text-green-400">
-                        {officer.registry}
-                      </td>
-                      <td className="p-4 font-bold text-gray-900 dark:text-white uppercase">
-                        {formatFullName(officer)}
-                      </td>
-                      <td className="p-4 text-sm text-gray-600 dark:text-gray-300 font-bold uppercase">
-                        {officer.kapisanan}
-                      </td>
-                      <td className="p-4 text-sm text-gray-600 dark:text-gray-300 font-bold uppercase">
-                        {officer.purok ? `${officer.purok}${officer.grupo ? ` - ${officer.grupo}` : ''}` : '-'}
-                      </td>
-                      <td className="p-4 text-xs text-gray-800 dark:text-gray-200 font-black uppercase tracking-wide">
-                        {displayRoles}
-                      </td>
-                      <td className="p-4 text-center">
-                        <span
-                          className={`px-4 py-1.5 rounded-full text-xs font-bold border ${displayStatus === 'ACTIVE'
-                              ? 'bg-[#e6f4ea] dark:bg-green-900/30 text-[#006B3F] dark:text-green-400 border-[#b7eb8f] dark:border-green-800'
-                              : 'bg-[#fff1f0] dark:bg-red-900/30 text-[#CE1126] dark:text-red-400 border-[#ffa39e] dark:border-red-800'
-                            }`}
-                        >
-                          {displayStatus}
-                        </span>
-                      </td>
-                    </tr>
+                    <React.Fragment key={officer.id}>
+                      <tr
+                        onClick={() => openProfile(officer)}
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors group ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                      >
+                        <td className="p-3 w-10" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => {
+                              const newExpanded = new Set(expandedRows);
+                              if (newExpanded.has(officer.id)) {
+                                newExpanded.delete(officer.id);
+                              } else {
+                                newExpanded.add(officer.id);
+                              }
+                              setExpandedRows(newExpanded);
+                            }}
+                            className="text-xs font-bold text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                          >
+                            {isExpanded ? '−' : '+'}
+                          </button>
+                        </td>
+                        {visibleColumns.actions && (
+                          <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => toggleSelectOfficer(officer.id, e)}
+                              className="w-4 h-4 cursor-pointer accent-slate-600"
+                            />
+                          </td>
+                        )}
+                        {visibleColumns.registry && (
+                          <td className="p-4 font-mono text-xs text-gray-500 dark:text-gray-400 font-semibold group-hover:text-slate-600 dark:group-hover:text-slate-400">
+                            {officer.registry}
+                          </td>
+                        )}
+                        {visibleColumns.controlNumber && (
+                          <td className="p-4 font-mono text-xs text-blue-600 dark:text-blue-400 font-bold group-hover:text-blue-700 dark:group-hover:text-blue-300 text-center">
+                            {(officer.controlNumber || '').padStart(4, '0') || '-'}
+                          </td>
+                        )}
+                        {visibleColumns.name && (
+                          <td className="p-4 font-bold text-gray-900 dark:text-white uppercase">
+                            {formatFullName(officer, officer.kapisanan)}
+                          </td>
+                        )}
+                        {visibleColumns.kapisanan && (
+                          <td className="p-4 text-sm text-gray-600 dark:text-gray-300 font-bold uppercase">
+                            {officer.kapisanan}
+                          </td>
+                        )}
+                        {visibleColumns.purok && (
+                          <td className="p-4 text-sm text-gray-600 dark:text-gray-300 font-bold uppercase">
+                            {officer.purok ? `${officer.purok}${officer.grupo ? ` - ${officer.grupo}` : ''}` : '-'}
+                          </td>
+                        )}
+                        {visibleColumns.tungkulin && (
+                          <td className="p-4 text-xs text-gray-800 dark:text-gray-200 font-black uppercase tracking-wide">
+                            {validRoles.length > 0 ? (
+                              <div className="space-y-1">
+                                {validRoles.map((t: any, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <span className="font-semibold">{t.name}</span>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${t.status === 'ACTIVE' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                      {t.status}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : 'N/A'}
+                          </td>
+                        )}
+                        {visibleColumns.actions && (
+                          <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => openProfile(officer)}
+                              className="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold py-2 px-4 rounded-lg transition-colors"
+                            >
+                              VIEW
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-slate-50 dark:bg-slate-800/50">
+                          <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <h4 className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs mb-2">Personal Info</h4>
+                                <p><span className="font-semibold">Gender:</span> {officer.gender}</p>
+                                <p><span className="font-semibold">Birthday:</span> {officer.birthday || 'N/A'}</p>
+                                <p><span className="font-semibold">Marriage Date:</span> {officer.marriageDate || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs mb-2">Contact Info</h4>
+                                <p><span className="font-semibold">Purok:</span> {officer.purok || 'N/A'}</p>
+                                <p><span className="font-semibold">Grupo:</span> {officer.grupo || 'N/A'}</p>
+                                <p><span className="font-semibold">Cell #:</span> {officer.cellphone ? `+63 ${officer.cellphone}` : 'N/A'}</p>
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs mb-2">Tungkulin List</h4>
+                                {officer.tungkulinList?.length > 0 ? (
+                                  <ul className="space-y-1">
+                                    {officer.tungkulinList.map((t: any, idx: number) => (
+                                      <li key={idx} className="text-xs">
+                                        {t.name} - <span className={t.status === 'ACTIVE' ? 'text-green-600' : 'text-red-600'}>{t.status}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-gray-500">No tungkulin assigned</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}
@@ -654,7 +950,7 @@ export default function OfficerDatabaseView({
                     setItemsPerPage(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="border border-gray-300 dark:border-slate-600 rounded-md p-1.5 text-sm bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 outline-none focus:ring-1 focus:ring-[#006B3F] font-bold"
+                  className="border border-gray-300 dark:border-slate-600 rounded-md p-1.5 text-sm bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 outline-none focus:ring-1 focus:ring-slate-500 font-bold"
                 >
                   <option value={25}>25</option>
                   <option value={50}>50</option>
@@ -673,7 +969,7 @@ export default function OfficerDatabaseView({
                 >
                   &larr; Nakaraan
                 </button>
-                <div className="px-4 py-2 text-sm font-black text-[#006B3F] dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-800/30">
+                <div className="px-4 py-2 text-sm font-black text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
                   Pahina {currentPage} of {totalPages}
                 </div>
                 <button
@@ -703,7 +999,7 @@ export default function OfficerDatabaseView({
                   setShowPreview(true);
                   setPreviewTab('pdf');
                 }}
-                className="w-full bg-[#006B3F] hover:bg-[#004d2d] text-white font-black py-4 px-6 rounded-xl shadow-lg transition-all flex justify-between items-center group"
+                className="w-full bg-slate-700 hover:bg-slate-800 text-white font-black py-4 px-6 rounded-xl shadow-lg transition-all flex justify-between items-center group"
               >
                 <span>Preview & Export</span>
                 <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
@@ -727,13 +1023,13 @@ export default function OfficerDatabaseView({
             {/* PREVIEW HEADER WITH TABS */}
             <div className="bg-gray-100 dark:bg-slate-800 p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => setPreviewTab('pdf')}
                   className={`px-6 py-2 rounded-lg font-bold uppercase text-sm transition-all ${previewTab === 'pdf' ? 'bg-green-600 text-white' : 'bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-slate-600'}`}
                 >
                   PDF Preview
                 </button>
-                <button 
+                <button
                   onClick={() => setPreviewTab('excel')}
                   className={`px-6 py-2 rounded-lg font-bold uppercase text-sm transition-all ${previewTab === 'excel' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-slate-600'}`}
                 >
@@ -743,28 +1039,49 @@ export default function OfficerDatabaseView({
               <button onClick={() => setShowPreview(false)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-2 rounded-lg transition-colors text-2xl font-bold">×</button>
             </div>
 
+            {/* COLUMN SELECTION */}
+            <div className="bg-gray-50 dark:bg-slate-800 p-4 border-b border-gray-200 dark:border-slate-700">
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Select Columns:</span>
+                <div className="flex flex-wrap gap-3">
+                  {Object.entries(exportVisibleColumns).map(([key, value]) => (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-700 px-3 py-1 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={value}
+                        onChange={(e) => setExportVisibleColumns({...exportVisibleColumns, [key]: e.target.checked})}
+                        className="w-4 h-4 rounded border-gray-300 text-slate-600 focus:ring-slate-500"
+                      />
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">{key === 'purokGrupo' ? 'Purok-Grupo' : key === 'cell' ? 'Cell #' : key}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* PREVIEW CONTENT */}
-            <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-slate-800">
+            <div className="flex-1 overflow-auto p-6 bg-gray-50">
               {previewTab === 'pdf' ? (
-                <div className="bg-white dark:bg-slate-900 text-black p-8 mx-auto w-full max-w-[8.5in]" style={{ fontFamily: '"Palatino Linotype", "Book Antiqua", Palatino, serif' }} dangerouslySetInnerHTML={{__html: generateMasterlistHTML().match(/<body>([\s\S]*?)<\/body>/)?.[1] || ''}} />
+                <div className="bg-white text-black p-8 mx-auto w-full max-w-[8.5in] shadow-lg" style={{ fontFamily: '"Palatino Linotype", "Book Antiqua", Palatino, serif' }} dangerouslySetInnerHTML={{__html: DOMPurify.sanitize(generateMasterlistHTML().match(/<body>([\s\S]*?)<\/body>/)?.[1] || '')}} />
               ) : (
                 <div className="bg-white text-black p-4 rounded-lg overflow-x-auto">
                   <table className="w-full border-collapse border border-gray-300 text-sm">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="border border-gray-300 p-2 text-left font-bold">Blg.</th>
-                        <th className="border border-gray-300 p-2 text-left font-bold">Registry No.</th>
-                        <th className="border border-gray-300 p-2 text-left font-bold">Pangalan</th>
-                        <th className="border border-gray-300 p-2 text-left font-bold">Kapisanan</th>
-                        <th className="border border-gray-300 p-2 text-left font-bold">Purok-Grupo</th>
-                        <th className="border border-gray-300 p-2 text-left font-bold">Tungkulin</th>
-                        <th className="border border-gray-300 p-2 text-left font-bold">Status</th>
+                        {exportVisibleColumns.blg && <th className="border border-gray-300 p-2 text-left font-bold">Blg.</th>}
+                        {exportVisibleColumns.registry && <th className="border border-gray-300 p-2 text-left font-bold">Registry No.</th>}
+                        {exportVisibleColumns.controlNumber && <th className="border border-gray-300 p-2 text-left font-bold">Control No.</th>}
+                        {exportVisibleColumns.pangalan && <th className="border border-gray-300 p-2 text-left font-bold">Pangalan</th>}
+                        {exportVisibleColumns.kapisanan && <th className="border border-gray-300 p-2 text-left font-bold">Kapisanan</th>}
+                        {exportVisibleColumns.purokGrupo && <th className="border border-gray-300 p-2 text-left font-bold">Purok-Grupo</th>}
+                        {exportVisibleColumns.tungkulin && <th className="border border-gray-300 p-2 text-left font-bold">Tungkulin</th>}
+                        {exportVisibleColumns.cell && <th className="border border-gray-300 p-2 text-left font-bold">Cell #</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {filteredOfficers.map((officer, index) => {
                         let displayRoles = '';
-                        let displayStatus = 'N/A';
+                        let displayCell = 'N/A';
                         const validRoles = officer.tungkulinList?.filter((t: any) => t.name.trim() !== '') || [];
 
                         if (tungkulinFilter !== 'ALL') {
@@ -776,23 +1093,23 @@ export default function OfficerDatabaseView({
                           });
                           if (matchingRole) {
                             displayRoles = matchingRole.name;
-                            displayStatus = matchingRole.status;
                           }
                         } else {
                           displayRoles = validRoles.map((t: any) => t.name).join(', ') || 'N/A';
-                          const isAnyActive = validRoles.some((t: any) => t.status === 'ACTIVE');
-                          displayStatus = validRoles.length ? (isAnyActive ? 'ACTIVE' : 'INACTIVE') : 'N/A';
                         }
+
+                        displayCell = officer.cellphone || 'N/A';
 
                         return (
                           <tr key={index} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 p-2">{index + 1}</td>
-                            <td className="border border-gray-300 p-2 font-bold">{officer.registry || 'N/A'}</td>
-                            <td className="border border-gray-300 p-2">{formatFullName(officer)}</td>
-                            <td className="border border-gray-300 p-2">{officer.kapisanan || ''}</td>
-                            <td className="border border-gray-300 p-2">{officer.purok ? `${officer.purok}${officer.grupo ? ` - ${officer.grupo}` : ''}` : '-'}</td>
-                            <td className="border border-gray-300 p-2">{displayRoles}</td>
-                            <td className="border border-gray-300 p-2 font-bold">{displayStatus}</td>
+                            {exportVisibleColumns.blg && <td className="border border-gray-300 p-2">{index + 1}</td>}
+                            {exportVisibleColumns.registry && <td className="border border-gray-300 p-2 font-bold">{officer.registry || 'N/A'}</td>}
+                            {exportVisibleColumns.controlNumber && <td className="border border-gray-300 p-2 font-bold text-center">{(officer.controlNumber || '').padStart(4, '0') || '-'}</td>}
+                            {exportVisibleColumns.pangalan && <td className="border border-gray-300 p-2">{formatFullName(officer, officer.kapisanan)}</td>}
+                            {exportVisibleColumns.kapisanan && <td className="border border-gray-300 p-2">{officer.kapisanan || ''}</td>}
+                            {exportVisibleColumns.purokGrupo && <td className="border border-gray-300 p-2">{officer.purok ? `${officer.purok}${officer.grupo ? ` - ${officer.grupo}` : ''}` : '-'}</td>}
+                            {exportVisibleColumns.tungkulin && <td className="border border-gray-300 p-2">{displayRoles}</td>}
+                            {exportVisibleColumns.cell && <td className="border border-gray-300 p-2 font-bold">{displayCell}</td>}
                           </tr>
                         );
                       })}

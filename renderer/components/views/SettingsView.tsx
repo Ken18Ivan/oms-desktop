@@ -1,5 +1,4 @@
-
-import React from 'react';
+import { useState, useRef } from 'react';
 
 interface SettingsViewProps {
   newPassword: string;
@@ -21,6 +20,7 @@ interface SettingsViewProps {
   departments: any[];
   updateDeptTarget: (id: string, target: number) => void;
   deleteDepartment: (id: string) => void;
+  bulkImportDepartments: (inputText: string) => void;
   newRoleInputs: Record<string, string>;
   setNewRoleInputs: (val: Record<string, string>) => void;
   addSpecificRole: (deptId: string) => void;
@@ -32,7 +32,36 @@ interface SettingsViewProps {
   setNewPurokGroupCount: (val: number) => void;
   addPurok: () => void;
   deletePurok: (id: string) => void;
-  bulkImportOfficers?: (officers: any[]) => void;
+  currentUsername: string;
+  setCurrentUsername: (val: string) => void;
+  newUsername: string;
+  setNewUsername: (val: string) => void;
+  currentPasswordForAuth: string;
+  setCurrentPasswordForAuth: (val: string) => void;
+  updateUsername: () => void;
+  updatePassword: () => void;
+  authModalOpen: boolean;
+  setAuthModalOpen: (val: boolean) => void;
+  authModalStep: 'verify' | 'change';
+  setAuthModalStep: (v: 'verify' | 'change') => void;
+  authModalCurrentPassword: string;
+  setAuthModalCurrentPassword: (v: string) => void;
+  authModalNewUsername: string;
+  setAuthModalNewUsername: (v: string) => void;
+  authModalNewPassword: string;
+  setAuthModalNewPassword: (v: string) => void;
+  authModalConfirmPassword: string;
+  setAuthModalConfirmPassword: (v: string) => void;
+  openChangeAuthModal: () => void;
+  closeChangeAuthModal: () => void;
+  verifyCurrentPassword: () => boolean;
+  submitAuthChange: () => void;
+  isDarkMode: boolean;
+  toggleDarkMode: () => void;
+  autoBackupEnabled: boolean;
+  setAutoBackupEnabled: (v: boolean) => void;
+  autoBackupFrequency: number;
+  setAutoBackupFrequency: (v: number) => void;
 }
 
 export default function SettingsView({
@@ -45,81 +74,47 @@ export default function SettingsView({
   newDeptName, setNewDeptName,
   newDeptTarget, setNewDeptTarget,
   addDepartment, departments,
-  updateDeptTarget, deleteDepartment,
+  updateDeptTarget, deleteDepartment, bulkImportDepartments,
   newRoleInputs, setNewRoleInputs,
   addSpecificRole, removeSpecificRole,
   purokList, newPurokName, setNewPurokName,
   newPurokGroupCount, setNewPurokGroupCount,
   addPurok, deletePurok,
-  bulkImportOfficers
+  currentUsername, setCurrentUsername,
+  newUsername, setNewUsername,
+  currentPasswordForAuth, setCurrentPasswordForAuth,
+  updateUsername, updatePassword,
+  authModalOpen, setAuthModalOpen,
+  authModalStep, setAuthModalStep,
+  authModalCurrentPassword, setAuthModalCurrentPassword,
+  authModalNewUsername, setAuthModalNewUsername,
+  authModalNewPassword, setAuthModalNewPassword,
+  authModalConfirmPassword, setAuthModalConfirmPassword,
+  openChangeAuthModal, closeChangeAuthModal,
+  verifyCurrentPassword, submitAuthChange,
+  isDarkMode, toggleDarkMode,
+  autoBackupEnabled, setAutoBackupEnabled,
+  autoBackupFrequency, setAutoBackupFrequency
 }: SettingsViewProps) {
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [isImporting, setIsImporting] = React.useState(false);
+  const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const deptFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    
+    setBulkImportFile(file);
+    
     try {
-      setIsImporting(true);
-      const XLSX = await import('xlsx');
-      const reader = new FileReader();
-
-      reader.onload = (event) => {
-        try {
-          const arrayBuffer = event.target?.result as ArrayBuffer;
-          const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const data = XLSX.utils.sheet_to_json(worksheet);
-
-          if (data.length === 0) {
-            showToast('No data found in the Excel file!', 'error');
-            return;
-          }
-
-          const importedOfficers = data.map((row: any) => ({
-            id: Math.random().toString(36).substr(2, 9),
-            firstName: row['First Name'] || row['firstName'] || '',
-            lastNameFather: row['Last Name (Father)'] || row['lastNameFather'] || '',
-            lastNameMother: row['Last Name (Mother)'] || row['lastNameMother'] || '',
-            lastNameSpouse: row['Last Name (Spouse)'] || row['lastNameSpouse'] || '',
-            suffix: row['Suffix'] || row['suffix'] || '',
-            gender: row['Gender'] || row['gender'] || 'LALAKI',
-            bday: row['Birthday'] || row['bday'] || '',
-            petsaKasal: row['Date of Marriage'] || row['petsaKasal'] || '',
-            registry: row['Registry No.'] || row['registry'] || '',
-            kapisanan: row['Kapisanan'] || row['kapisanan'] || 'BUKLOD',
-            purok: row['Purok'] || row['purok'] || '',
-            grupo: row['Grupo'] || row['grupo'] || '',
-            tungkulinList: [],
-            lastModified: new Date().toISOString(),
-            isNew: false,
-          }));
-
-          if (bulkImportOfficers) {
-            bulkImportOfficers(importedOfficers);
-          }
-
-          showToast(`✅ Successfully imported ${importedOfficers.length} officers!`, 'success');
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-        } catch (parseError) {
-          console.error('Parse error:', parseError);
-          showToast('Error parsing Excel file. Please check the format.', 'error');
-        } finally {
-          setIsImporting(false);
-        }
-      };
-
-      reader.readAsArrayBuffer(file);
+      const text = await file.text();
+      setBulkImportText(text);
     } catch (error) {
-      console.error('Import error:', error);
-      showToast('Error importing file', 'error');
-      setIsImporting(false);
+      showToast('Error processing file', 'error');
     }
   };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
       <div className="border-b border-gray-300 dark:border-slate-700 pb-4">
@@ -130,47 +125,183 @@ export default function SettingsView({
       <div className="bg-white dark:bg-slate-800 shadow-md rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors mt-6 mb-6">
         <div className="bg-purple-900 dark:bg-purple-950 p-6 border-b-4 border-purple-500">
           <h2 className="text-xl font-bold text-white uppercase tracking-wider">Access Security</h2>
-          <p className="text-purple-200 text-sm mt-1">Palitan ang system password na ginagamit sa pag-login.</p>
+          <p className="text-purple-200 text-sm mt-1">Palitan ang username at system password na ginagamit sa pag-login.</p>
         </div>
-        <div className="p-6 bg-gray-50 dark:bg-slate-800 flex gap-4 items-end flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-900 dark:text-white"
-              placeholder="Enter new password"
-            />
+
+        {/* Dark Mode Toggle */}
+        <div className="p-6 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+          <div className="flex justify-between items-center">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Dark Mode</label>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Toggle dark/light theme for the application</p>
+            </div>
+            <button
+              onClick={toggleDarkMode}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                isDarkMode ? 'bg-slate-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Confirm Password</label>
+        </div>
+
+        {/* Auto Backup Toggle */}
+        <div className="p-6 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Auto Backup</label>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Automatically backup data at specified intervals</p>
+            </div>
+            <button
+              onClick={() => setAutoBackupEnabled(!autoBackupEnabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                autoBackupEnabled ? 'bg-slate-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  autoBackupEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          {autoBackupEnabled && (
+            <div className="flex items-center gap-4">
+              <label className="text-sm text-gray-600 dark:text-gray-400">Backup every</label>
+              <select
+                value={autoBackupFrequency}
+                onChange={(e) => setAutoBackupFrequency(parseInt(e.target.value))}
+                className="border border-gray-300 dark:border-slate-600 rounded-md p-2 bg-white dark:bg-slate-900 dark:text-white"
+              >
+                <option value={5}>5 minutes</option>
+                <option value={15}>15 minutes</option>
+                <option value={30}>30 minutes</option>
+                <option value={60}>1 hour</option>
+              </select>
+            </div>
+          )}
+        </div>
+        
+        {/* Username Display */}
+        <div className="p-6 bg-gray-50 dark:bg-slate-800">
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Current Username</label>
             <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-900 dark:text-white"
-              placeholder="Confirm new password"
+              type="text"
+              value={currentUsername}
+              readOnly
+              className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none bg-gray-100 dark:bg-slate-900 dark:text-gray-400 font-bold"
             />
           </div>
           <button
-            onClick={() => {
-              if (newPassword && newPassword === confirmPassword) {
-                localStorage.setItem('oms_system_password', newPassword);
-                showToast("Password updated successfully!");
-                setNewPassword('');
-                setConfirmPassword('');
-              } else {
-                showToast("Passwords do not match or are empty!", "error");
-              }
-            }}
+            onClick={openChangeAuthModal}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-md shadow-sm w-full md:w-auto transition-all"
           >
-            UPDATE PASSWORD
+            Change Username/Password
           </button>
         </div>
       </div>
 
+      {/* Auth Modal */}
+      {authModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full mx-4">
+            <div className="bg-purple-900 dark:bg-purple-950 p-6 border-b-4 border-purple-500">
+              <h3 className="text-xl font-bold text-white uppercase tracking-wider">
+                {authModalStep === 'verify' ? 'Verify Current Password' : 'Change Username/Password'}
+              </h3>
+            </div>
+            
+            <div className="p-6">
+              {authModalStep === 'verify' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Current Password</label>
+                    <input
+                      type="password"
+                      value={authModalCurrentPassword}
+                      onChange={(e) => setAuthModalCurrentPassword(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') verifyCurrentPassword(); }}
+                      className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-900 dark:text-white"
+                      placeholder="Enter current password"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={closeChangeAuthModal}
+                      className="flex-1 bg-gray-300 dark:bg-slate-700 text-gray-800 dark:text-white font-bold py-3 px-6 rounded-md transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={verifyCurrentPassword}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-md transition-all"
+                    >
+                      Verify
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">New Username</label>
+                    <input
+                      type="text"
+                      value={authModalNewUsername}
+                      onChange={(e) => setAuthModalNewUsername(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-900 dark:text-white"
+                      placeholder="Enter new username"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">New Password</label>
+                    <input
+                      type="password"
+                      value={authModalNewPassword}
+                      onChange={(e) => setAuthModalNewPassword(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-900 dark:text-white"
+                      placeholder="Enter new password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Confirm Password</label>
+                    <input
+                      type="password"
+                      value={authModalConfirmPassword}
+                      onChange={(e) => setAuthModalConfirmPassword(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') submitAuthChange(); }}
+                      className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-900 dark:text-white"
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={closeChangeAuthModal}
+                      className="flex-1 bg-gray-300 dark:bg-slate-700 text-gray-800 dark:text-white font-bold py-3 px-6 rounded-md transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={submitAuthChange}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-md transition-all"
+                    >
+                      Update
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DATABASE MANAGEMENT */}
       <div className="bg-white dark:bg-slate-800 shadow-md rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors">
         <div className="bg-blue-900 dark:bg-blue-950 p-6 border-b-4 border-blue-500 flex justify-between items-center">
           <div>
@@ -195,15 +326,15 @@ export default function SettingsView({
               setSaveLocation(e.target.value);
               localStorage.setItem('oms_custom_path', e.target.value);
             }}
-            placeholder="E.g. C:\Users\Documents or choose folder below..."
-            className="flex-1 p-2 rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-mono text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-[#006B3F] transition-all"
+            placeholder="Choose a folder to save your database"
+            className="flex-1 p-2 rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-mono text-slate-600 dark:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all"
           />
         </div>
 
         <div className="flex gap-4">
           <button
             onClick={handleFolderPick}
-            className="bg-[#006B3F] hover:bg-[#004d2d] text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all"
+            className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all"
           >
             Change Save Folder
           </button>
@@ -217,57 +348,6 @@ export default function SettingsView({
         <p className="mt-4 p-2 bg-black text-red-500 text-xs font-mono font-bold rounded">
           {'>'} LOG: {debugLog}
         </p>
-      </div>
-
-      {/* BULK IMPORT SECTION */}
-      <div className="bg-white dark:bg-slate-800 shadow-md rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors">
-        <div className="bg-teal-900 dark:bg-teal-950 p-6 border-b-4 border-teal-500">
-          <h2 className="text-xl font-bold text-white uppercase tracking-wider">Bulk Import Officers</h2>
-          <p className="text-teal-200 text-sm mt-1">I-upload ang Excel file upang mag-import ng maraming officers sa isang pagkakataon.</p>
-        </div>
-        <div className="p-6 bg-gray-50 dark:bg-slate-800 flex flex-col gap-4">
-          <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-4">
-            <h3 className="text-sm font-bold text-teal-900 dark:text-teal-300 mb-2 uppercase">Excel Format Required:</h3>
-            <ul className="text-xs text-teal-800 dark:text-teal-300 space-y-1 ml-4 list-disc">
-              <li>First Name</li>
-              <li>Last Name (Father)</li>
-              <li>Last Name (Mother)</li>
-              <li>Last Name (Spouse) - for female officers</li>
-              <li>Suffix - optional (Jr., Sr., etc.)</li>
-              <li>Gender - LALAKI or BABAE</li>
-              <li>Birthday - YYYY-MM-DD format</li>
-              <li>Date of Marriage - YYYY-MM-DD format</li>
-              <li>Registry No.</li>
-              <li>Kapisanan - BUKLOD, KADIWA, or BINHI</li>
-              <li>Purok - area number</li>
-              <li>Grupo - group number</li>
-            </ul>
-          </div>
-
-          <div className="flex gap-4 items-center">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleBulkImport}
-              disabled={isImporting}
-              className="flex-1 p-3 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-700 dark:text-gray-300 cursor-pointer"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isImporting}
-              className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all whitespace-nowrap"
-            >
-              {isImporting ? 'Importing...' : '📤 Select File'}
-            </button>
-          </div>
-
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-            <p className="text-xs text-yellow-800 dark:text-yellow-300 font-bold">
-              ⚠️ Tip: Make sure your Excel file has headers in the first row matching the column names listed above.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* PUROK MANAGEMENT */}
@@ -326,9 +406,17 @@ export default function SettingsView({
       </div>
 
       <div className="bg-white dark:bg-slate-800 shadow-md rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors">
-        <div className="bg-gray-800 dark:bg-slate-900 p-6 border-b-4 border-[#CE1126]">
-          <h2 className="text-xl font-bold text-white uppercase tracking-wider">Mga Tungkulin (Department Roles)</h2>
-          <p className="text-gray-400 text-sm mt-1">Magdagdag ng department, target, at mga sub-roles.</p>
+        <div className="bg-gray-800 dark:bg-slate-900 p-6 border-b-4 border-slate-600 flex justify-between items-center relative">
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-white uppercase tracking-wider">Mga Tungkulin (Department Roles)</h2>
+            <p className="text-gray-400 text-sm mt-1">Magdagdag ng department, target, at mga sub-roles.</p>
+          </div>
+          <button
+            onClick={() => setBulkImportModalOpen(true)}
+            className="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-all text-sm cursor-pointer relative z-10 ml-4"
+          >
+            Bulk Import
+          </button>
         </div>
 
         <div className="p-6 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex gap-4 items-end">
@@ -339,7 +427,7 @@ export default function SettingsView({
               value={newDeptName}
               onChange={(e) => setNewDeptName(e.target.value.toUpperCase())}
               onKeyDown={(e) => { if (e.key === 'Enter') addDepartment(); }}
-              className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-[#006B3F] uppercase dark:bg-slate-900 dark:text-white"
+              className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-slate-500 uppercase dark:bg-slate-900 dark:text-white"
             />
           </div>
           <div className="w-32">
@@ -349,10 +437,10 @@ export default function SettingsView({
               value={newDeptTarget}
               onChange={(e) => setNewDeptTarget(parseInt(e.target.value) || 0)}
               onKeyDown={(e) => { if (e.key === 'Enter') addDepartment(); }}
-              className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-[#006B3F] dark:bg-slate-900 dark:text-white"
+              className="w-full border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-slate-500 dark:bg-slate-900 dark:text-white"
             />
           </div>
-          <button onClick={addDepartment} className="bg-[#006B3F] hover:bg-[#004d2d] text-white font-bold py-3 px-6 rounded-md shadow-sm">
+          <button onClick={addDepartment} className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-md shadow-sm">
             + ADD DEPT
           </button>
         </div>
@@ -368,14 +456,14 @@ export default function SettingsView({
                     type="number"
                     value={dept.target}
                     onChange={(e) => updateDeptTarget(dept.id, parseInt(e.target.value) || 0)}
-                    className="w-20 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-center font-black text-[#006B3F] dark:text-green-400 outline-none focus:ring-2 focus:ring-[#006B3F] bg-gray-50 dark:bg-slate-800"
+                    className="w-20 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-center font-black text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-slate-500 bg-gray-50 dark:bg-slate-800"
                   />
                   <button onClick={() => deleteDepartment(dept.id)} className="text-red-500 hover:text-red-700 font-bold px-2 ml-2">DELETE DEPT</button>
                 </div>
               </div>
 
               <div className="pl-4 border-l-4 border-green-100 dark:border-green-900/50">
-                <p className="text-xs font-bold text-[#006B3F] dark:text-green-500 uppercase mb-3">Magdagdag ng mga Sub-Role (Gampanin):</p>
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-400 uppercase mb-3">Magdagdag ng mga Sub-Role (Gampanin):</p>
 
                 <div className="flex flex-wrap gap-2 mb-4">
                   {dept.specificRoles?.length === 0 && <span className="text-xs text-gray-400 italic">Walang naka-save na sub-roles.</span>}
@@ -398,7 +486,7 @@ export default function SettingsView({
                         addSpecificRole(dept.id);
                       }
                     }}
-                    className="border border-gray-300 dark:border-slate-600 rounded-md p-2 text-sm outline-none focus:ring-2 focus:ring-[#006B3F] w-64 uppercase dark:bg-slate-800 dark:text-white"
+                    className="border border-gray-300 dark:border-slate-600 rounded-md p-2 text-sm outline-none focus:ring-2 focus:ring-slate-500 w-64 uppercase dark:bg-slate-800 dark:text-white"
                   />
                   <button onClick={() => addSpecificRole(dept.id)} className="bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 text-gray-800 dark:text-white font-bold py-2 px-4 rounded-md text-sm transition-colors">
                     Add Role
@@ -409,6 +497,89 @@ export default function SettingsView({
           ))}
         </div>
       </div>
+
+      {/* Bulk Import Departments Modal */}
+      {bulkImportModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+            <div className="bg-gray-800 dark:bg-slate-900 p-6 border-b-4 border-slate-600">
+              <h3 className="text-xl font-bold text-white uppercase tracking-wider">Bulk Import Departments</h3>
+              <p className="text-gray-400 text-sm mt-1">Paste your department data in the format below</p>
+            </div>
+            
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4 mb-4 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                <p className="font-bold mb-2 uppercase">Format:</p>
+                <pre className="whitespace-pre-wrap">
+Department Name, Target: 10
+    - Sub Role 1
+    - Sub Role 2
+
+Another Department
+    - Sub Role A
+                </pre>
+              </div>
+              
+              <div className="flex gap-4 mb-4">
+                <input
+                  ref={deptFileInputRef}
+                  type="file"
+                  accept=".txt,.docx,.pdf"
+                  onChange={handleDeptFileChange}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => deptFileInputRef.current?.click()}
+                  className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-all text-sm cursor-pointer"
+                >
+                  📁 Select File (.txt, .docx, .pdf)
+                </button>
+                {bulkImportFile && (
+                  <span className="flex-1 text-xs text-gray-600 dark:text-gray-400 py-2 px-4 bg-gray-100 dark:bg-slate-900 rounded-lg truncate">
+                    {bulkImportFile.name}
+                  </span>
+                )}
+              </div>
+
+              <textarea
+                value={bulkImportText}
+                onChange={(e) => setBulkImportText(e.target.value)}
+                placeholder="Paste your department data here or select a file..."
+                className="w-full h-48 p-4 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:ring-2 focus:ring-slate-500 dark:bg-slate-900 dark:text-white font-mono text-sm"
+              />
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 dark:border-slate-700 flex gap-4">
+              <button
+                onClick={() => {
+                  setBulkImportModalOpen(false);
+                  setBulkImportText('');
+                  setBulkImportFile(null);
+                }}
+                className="flex-1 bg-gray-300 dark:bg-slate-700 text-gray-800 dark:text-white font-bold py-3 px-6 rounded-lg transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (bulkImportText.trim()) {
+                    bulkImportDepartments(bulkImportText);
+                    setBulkImportModalOpen(false);
+                    setBulkImportText('');
+                    setBulkImportFile(null);
+                  } else {
+                    showToast('Please enter department data before importing', 'error');
+                  }
+                }}
+                className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-lg transition-all cursor-pointer relative z-10"
+              >
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

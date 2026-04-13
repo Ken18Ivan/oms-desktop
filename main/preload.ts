@@ -1,24 +1,25 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+const { contextBridge, ipcRenderer } = require('electron')
+
+// Whitelist of allowed IPC channels
+const ALLOWED_CHANNELS = [
+  'save-db',
+  'load-db',
+  'select-directory',
+  'print-to-pdf',
+  'save-pdf-dialog'
+];
 
 const handler = {
-  send<T>(channel: string, value?: T) {
-    ipcRenderer.send(channel, value)
-  },
-  on<T>(channel: string, callback: (...args: T[]) => void) {
-    const subscription = (_event: IpcRendererEvent, ...args: T[]) =>
-      callback(...args)
-    ipcRenderer.on(channel, subscription)
-
-    return () => {
-      ipcRenderer.removeListener(channel, subscription)
+  invoke: async (channel: string, data?: any) => {
+    if (ALLOWED_CHANNELS.includes(channel as any)) {
+      return ipcRenderer.invoke(channel, data);
     }
+    throw new Error(`IPC channel "${channel}" is not allowed`);
   },
-  invoke: (channel: string, data?: any) => ipcRenderer.invoke(channel, data),
-  // ADDED: This bridges the folder selection to the renderer
   selectFolder: () => ipcRenderer.invoke('select-directory'),
 }
 
-// Now we expose the whole object at once
+// Expose only specific methods
 contextBridge.exposeInMainWorld('ipc', handler)
 
 export type IpcHandler = typeof handler

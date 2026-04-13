@@ -1,8 +1,17 @@
 import type { AppProps } from 'next/app'
+import { useEffect } from 'react'
 
 import '../styles/globals.css'
 
 function MyApp({ Component, pageProps }: AppProps) {
+  useEffect(() => {
+    // Apply dark mode class immediately to prevent white flash
+    const savedTheme = localStorage.getItem('iligan_theme');
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
   return <Component {...pageProps} />
 }
 
