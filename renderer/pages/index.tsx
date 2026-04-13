@@ -6,6 +6,7 @@ import { OMSProvider, useOMS } from '../context/OMSContext';
 import LoginScreen from '../components/LoginScreen';
 import DashboardView from '../components/views/DashboardView';
 import OfficerDatabaseView from '../components/views/OfficerDatabaseView';
+import MaytungkulinSearchView from '../components/views/MaytungkulinSearchView';
 import OfficerProfileForm from '../components/views/OfficerProfileForm';
 import OfficersEncodingView from '../components/views/OfficersEncodingView';
 import SettingsView from '../components/views/SettingsView';
@@ -80,6 +81,7 @@ function AppShell() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [officersDropdownOpen, setOfficersDropdownOpen] = useState(false);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -91,9 +93,9 @@ function AppShell() {
           saveOfficer();
         }
       }
-      // Ctrl+F to focus search (only in DATABASE view)
+      // Ctrl+F to focus MT search
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        if (view === 'DATABASE') {
+        if (view === 'MT_SEARCH') {
           e.preventDefault();
           const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
           if (searchInput) searchInput.focus();
@@ -215,12 +217,40 @@ function AppShell() {
 
           <div className="hidden md:flex space-x-2 items-center">
             <button onClick={() => handleNavigation('DASHBOARD')} aria-label="Navigate to Dashboard" aria-current={view === 'DASHBOARD' ? 'page' : undefined} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'DASHBOARD' ? 'bg-slate-700 dark:bg-slate-800 text-white shadow-inner' : 'text-slate-300 hover:bg-slate-700 dark:hover:bg-slate-800'}`}>HOME</button>
-            <button onClick={() => handleNavigation('DATABASE')} aria-label="Navigate to Officers Database" aria-current={view === 'DATABASE' || view === 'PROFILE' ? 'page' : undefined} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${view === 'DATABASE' || view === 'PROFILE' ? 'bg-slate-700 dark:bg-slate-800 text-white shadow-inner' : 'text-slate-300 hover:bg-slate-700 dark:hover:bg-slate-800'}`}>
-              OFFICERS <span className="bg-white/20 text-[10px] px-1.5 py-0.5 rounded-full font-black">{officers.length}</span>
-            </button>
-            <button onClick={() => handleNavigation('ENCODING')} aria-label="Navigate to Officers Encoding" aria-current={view === 'ENCODING' ? 'page' : undefined} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${view === 'ENCODING' ? 'bg-slate-700 dark:bg-slate-800 text-white shadow-inner' : 'text-slate-300 hover:bg-slate-700 dark:hover:bg-slate-800'}`}>
-              ENCODING
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setOfficersDropdownOpen(!officersDropdownOpen)}
+                aria-label="Officers menu"
+                aria-expanded={officersDropdownOpen}
+                aria-haspopup="true"
+                aria-current={view === 'DATABASE' || view === 'PROFILE' || view === 'MT_SEARCH' || view === 'ENCODING' ? 'page' : undefined}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${view === 'DATABASE' || view === 'PROFILE' || view === 'MT_SEARCH' || view === 'ENCODING' || officersDropdownOpen ? 'bg-slate-700 dark:bg-slate-800 text-white shadow-inner' : 'text-slate-300 hover:bg-slate-700 dark:hover:bg-slate-800'}`}
+              >
+                OFFICERS <span className="bg-white/20 text-[10px] px-1.5 py-0.5 rounded-full font-black">{officers.length}</span>
+              </button>
+              {officersDropdownOpen && (
+                <div className="absolute left-0 mt-2 w-44 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 py-2 z-50">
+                  <button
+                    onClick={() => { handleNavigation('DATABASE'); setOfficersDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm font-bold transition-colors ${view === 'DATABASE' || view === 'PROFILE' ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-700/50' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                  >
+                    MT List
+                  </button>
+                  <button
+                    onClick={() => { handleNavigation('MT_SEARCH'); setOfficersDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm font-bold transition-colors ${view === 'MT_SEARCH' ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-700/50' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                  >
+                    MT Search
+                  </button>
+                  <button
+                    onClick={() => { handleNavigation('ENCODING'); setOfficersDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm font-bold transition-colors ${view === 'ENCODING' ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-700/50' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                  >
+                    MT Encoding
+                  </button>
+                </div>
+              )}
+            </div>
             {/* Admin Profile Dropdown */}
             <div className="relative ml-2">
               <button
@@ -305,6 +335,12 @@ function AppShell() {
                 OFFICERS <span className="bg-white/20 text-[10px] px-1.5 py-0.5 rounded-full font-black">{officers.length}</span>
               </button>
               <button 
+                onClick={() => { handleNavigation('MT_SEARCH'); setMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all ${view === 'MT_SEARCH' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                MT SEARCH
+              </button>
+              <button 
                 onClick={() => { handleNavigation('ENCODING'); setMobileMenuOpen(false); }}
                 className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all ${view === 'ENCODING' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-800'}`}
               >
@@ -356,6 +392,16 @@ function AppShell() {
           )}
         </div>
 
+        {/* MT SEARCH */}
+        <div className={view === 'MT_SEARCH' ? 'block print:hidden' : 'hidden'}>
+          {view === 'MT_SEARCH' && (
+            <MaytungkulinSearchView
+              officers={officers}
+              openProfile={openProfile}
+            />
+          )}
+        </div>
+
         {/* PROFILE */}
         <div className={view === 'PROFILE' ? 'block print:hidden' : 'hidden'}>
           {view === 'PROFILE' && formState && (
@@ -373,6 +419,7 @@ function AppShell() {
               setView={handleNavigation} purokList={purokList}
               confirmModalState={confirmModalState} setConfirmModalState={setConfirmModalState}
               departments={departments}
+              officers={officers}
             />
           )}
         </div>

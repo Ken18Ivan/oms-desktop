@@ -91,6 +91,7 @@ export default function OfficerDatabaseView({
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [showFilterPresets, setShowFilterPresets] = useState(false);
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
   const [filterPresets, setFilterPresets] = useState<{name: string, filters: any}[]>([]);
   const [newPresetName, setNewPresetName] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -121,7 +122,14 @@ export default function OfficerDatabaseView({
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, tungkulinFilter, subRoleFilter, kapisananFilter, statusFilter, purokFilter, grupoFilter]);
+  }, [tungkulinFilter, subRoleFilter, kapisananFilter, statusFilter, purokFilter, grupoFilter]);
+
+  // Officers view no longer uses text search; clear hidden query filter.
+  useEffect(() => {
+    if (searchQuery) {
+      setSearchQuery('');
+    }
+  }, [searchQuery, setSearchQuery]);
   
   // Auto-hide notification after 3 seconds
   useEffect(() => {
@@ -145,16 +153,11 @@ export default function OfficerDatabaseView({
         e.preventDefault();
         setShowExportModal(true);
       }
-      // Ctrl+F - Focus Search
-      if (e.ctrlKey && e.key === 'f') {
-        e.preventDefault();
-        const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
-        if (searchInput) searchInput.focus();
-      }
       // Escape - Close modals/menus
       if (e.key === 'Escape') {
         setShowColumnMenu(false);
         setShowFilterPresets(false);
+        setShowFiltersPanel(false);
         setShowExportModal(false);
         setShowPreview(false);
       }
@@ -171,6 +174,7 @@ export default function OfficerDatabaseView({
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredOfficers.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredOfficers, currentPage, itemsPerPage]);
+
 
   // Generate Masterlist HTML
   const generateMasterlistHTML = () => {
@@ -411,6 +415,7 @@ export default function OfficerDatabaseView({
         </div>
       </div>
 
+
       {/* Column Visibility Menu */}
       {showColumnMenu && (
         <div className="absolute z-50 right-4 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 p-4 w-64">
@@ -497,6 +502,12 @@ export default function OfficerDatabaseView({
       {/* FILTER PRESETS TOGGLE */}
       <div className="flex justify-end gap-2">
         <button
+          onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${showFiltersPanel ? 'bg-slate-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+        >
+          Filters
+        </button>
+        <button
           onClick={() => setShowColumnMenu(!showColumnMenu)}
           className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
         >
@@ -512,7 +523,6 @@ export default function OfficerDatabaseView({
               onChange={(e) => {
                 const preset = filterPresets.find(p => p.name === e.target.value);
                 if (preset) {
-                  setSearchQuery(preset.filters.searchQuery);
                   setTungkulinFilter(preset.filters.tungkulinFilter);
                   setSubRoleFilter(preset.filters.subRoleFilter);
                   setKapisananFilter(preset.filters.kapisananFilter);
@@ -550,7 +560,6 @@ export default function OfficerDatabaseView({
                   const newPreset = {
                     name: newPresetName,
                     filters: {
-                      searchQuery,
                       tungkulinFilter,
                       subRoleFilter,
                       kapisananFilter,
@@ -592,16 +601,8 @@ export default function OfficerDatabaseView({
       )}
 
       {/* FILTERS BAR */}
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showFiltersPanel ? 'max-h-[560px] opacity-100' : 'max-h-0 opacity-0'}`}>
       <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 flex flex-wrap lg:flex-nowrap gap-4 items-end transition-colors">
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hanapin (Pangalan o Registry)</label>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
-            className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 rounded-lg p-3 focus:ring-2 focus:ring-slate-500 outline-none transition-all uppercase text-gray-900 dark:text-white"
-          />
-        </div>
 
         <div className="w-full lg:w-48">
           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Department</label>
@@ -702,6 +703,7 @@ export default function OfficerDatabaseView({
           </div>
         )}
       </div>
+      </div>
 
       {selectedOfficers.length > 0 && (
         <div className="flex gap-4 items-center bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl shadow-sm">
@@ -756,6 +758,11 @@ export default function OfficerDatabaseView({
                 {visibleColumns.registry && (
                   <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => handleSort('registry')}>
                     Registry No. {getSortIcon('registry')}
+                  </th>
+                )}
+                {visibleColumns.controlNumber && (
+                  <th className="p-4 font-black cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-center" onClick={() => handleSort('controlNumber')}>
+                    Control No. {getSortIcon('controlNumber')}
                   </th>
                 )}
                 {visibleColumns.name && (
@@ -984,6 +991,8 @@ export default function OfficerDatabaseView({
           </div>
         )}
       </div>
+
+
 
       {/* EXPORT OPTIONS MODAL */}
       {showExportModal && (

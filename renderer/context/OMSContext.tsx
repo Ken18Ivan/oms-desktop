@@ -74,8 +74,8 @@ interface OMSContextValue {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   showHeader: boolean;
-  view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING';
-  handleNavigation: (v: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING') => void;
+  view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING' | 'MT_SEARCH';
+  handleNavigation: (v: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING' | 'MT_SEARCH') => void;
   autoBackupEnabled: boolean;
   setAutoBackupEnabled: (v: boolean) => void;
   autoBackupFrequency: number; // in minutes
@@ -373,7 +373,7 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ── Navigation ────────────────────────────────────────────
-  const [view, setView] = useState<'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING'>('DASHBOARD');
+  const [view, setView] = useState<'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING' | 'MT_SEARCH'>('DASHBOARD');
   const [isDirty, setIsDirty] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => {
@@ -404,7 +404,7 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleNavigation = (newView: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING') => {
+  const handleNavigation = (newView: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING' | 'MT_SEARCH') => {
     if (isDirty) {
       runConfirm('May Mga Hindi Pa Naka-save', 'Sigurado ka ba? Mawawala ang lahat ng iyong ginawang pagbabago.', () => {
         setIsDirty(false);

@@ -9,6 +9,7 @@ const source = path.join(__dirname, 'main', 'preload.cjs');
 const dest = path.join(__dirname, 'app', 'preload.cjs');
 
 try {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(source, dest);
   console.log('✓ Copied preload.cjs to app directory');
 } catch (error) {

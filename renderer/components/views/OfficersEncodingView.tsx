@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Plus, FileSpreadsheet, ArrowLeft, Calendar, User } from 'lucide-react';
 
 interface OfficersEncodingViewProps {
-  handleNavigation: (view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING') => void;
+  handleNavigation: (view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING' | 'MT_SEARCH') => void;
   bulkImportOfficers: (importedOfficers: any[]) => void;
   officers: any[];
   addNewOfficer: () => void;

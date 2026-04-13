@@ -1,5 +1,5 @@
 
-import { Users, Activity, AlertCircle, CheckCircle2, ChevronRight, AlertTriangle, FileWarning, Plus, FileSpreadsheet, Cake } from 'lucide-react';
+import { Users, Activity, AlertCircle, ChevronRight, AlertTriangle, FileWarning, Plus, FileSpreadsheet, Cake, Search } from 'lucide-react';
 
 interface DeptHealth {
   name: string;
@@ -27,7 +27,7 @@ interface DashData {
 interface DashboardViewProps {
   dashData: DashData;
   todayDate: string;
-  handleNavigation: (view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING') => void;
+  handleNavigation: (view: 'DASHBOARD' | 'DATABASE' | 'PROFILE' | 'SETTINGS' | 'ENCODING' | 'MT_SEARCH') => void;
   setStatusFilter: (filter: string) => void;
   setSearchQuery: (query: string) => void;
 }
@@ -60,7 +60,7 @@ export default function DashboardView({ dashData, todayDate, handleNavigation, s
       </div>
 
       {/* TOP METRICS GRIDS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* TOTAL OFFICERS CARD */}
         <div
           onClick={() => navigateToFilteredDb('ALL')}
@@ -81,46 +81,6 @@ export default function DashboardView({ dashData, todayDate, handleNavigation, s
           </div>
         </div>
 
-        {/* ACTIVE OFFICERS CARD */}
-        <div
-          onClick={() => navigateToFilteredDb('ACTIVE')}
-          className="group cursor-pointer bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/10 rounded-3xl p-6 shadow-sm border border-emerald-200 dark:border-green-800 hover:shadow-lg transition-all hover:-translate-y-1 relative overflow-hidden"
-        >
-          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-[#006B3F]">
-            <CheckCircle2 className="w-32 h-32" />
-          </div>
-          <div className="flex justify-between items-start mb-4">
-            <div className="bg-white/60 dark:bg-green-900/50 p-3 rounded-2xl backdrop-blur-sm">
-              <CheckCircle2 className="w-6 h-6 text-[#006B3F] dark:text-green-400" />
-            </div>
-            <ChevronRight className="w-5 h-5 text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-4xl font-black text-[#006B3F] dark:text-green-400">{dashData.active}</span>
-            <span className="text-xs font-bold text-emerald-800 dark:text-emerald-500 uppercase tracking-widest mt-1">Active Officers</span>
-          </div>
-        </div>
-
-        {/* INACTIVE OFFICERS CARD */}
-        <div
-          onClick={() => navigateToFilteredDb('INACTIVE')}
-          className="group cursor-pointer bg-gradient-to-br from-rose-50 to-rose-100 dark:from-red-900/20 dark:to-rose-900/10 rounded-3xl p-6 shadow-sm border border-rose-200 dark:border-red-800 hover:shadow-lg transition-all hover:-translate-y-1 relative overflow-hidden"
-        >
-          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-[#CE1126]">
-            <AlertCircle className="w-32 h-32" />
-          </div>
-          <div className="flex justify-between items-start mb-4">
-            <div className="bg-white/60 dark:bg-red-900/50 p-3 rounded-2xl backdrop-blur-sm">
-              <AlertCircle className="w-6 h-6 text-[#CE1126] dark:text-red-400" />
-            </div>
-            <ChevronRight className="w-5 h-5 text-rose-600 dark:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-4xl font-black text-[#CE1126] dark:text-red-400">{dashData.inactive}</span>
-            <span className="text-xs font-bold text-rose-800 dark:text-rose-500 uppercase tracking-widest mt-1">Inactive Officers</span>
-          </div>
-        </div>
-
         {/* OFFICERS ENCODING CARD */}
         <div
           onClick={() => handleNavigation('ENCODING')}
@@ -138,6 +98,26 @@ export default function DashboardView({ dashData, todayDate, handleNavigation, s
           <div className="flex flex-col">
             <span className="text-sm font-black text-[#006B3F] dark:text-teal-400">Officers Encoding</span>
             <span className="text-xs font-bold text-teal-800 dark:text-teal-500 uppercase tracking-widest mt-1">Add Record / Bulk Import</span>
+          </div>
+        </div>
+
+        {/* MT SEARCH CARD */}
+        <div
+          onClick={() => handleNavigation('MT_SEARCH')}
+          className="group cursor-pointer bg-gradient-to-br from-slate-50 to-gray-100 dark:from-slate-900/30 dark:to-slate-800/20 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all hover:-translate-y-1 relative overflow-hidden"
+        >
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity text-slate-600 dark:text-slate-300">
+            <Search className="w-32 h-32" />
+          </div>
+          <div className="flex justify-between items-start mb-4">
+            <div className="bg-white/70 dark:bg-slate-900/50 p-3 rounded-2xl backdrop-blur-sm">
+              <Search className="w-6 h-6 text-slate-700 dark:text-slate-300" />
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-black text-slate-800 dark:text-slate-200">MT Search</span>
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mt-1">Find MT Quickly</span>
           </div>
         </div>
       </div>
@@ -163,6 +143,20 @@ export default function DashboardView({ dashData, todayDate, handleNavigation, s
               <div>
                 <h3 className="font-black tracking-tight text-xl text-gray-900 dark:text-white mb-1">Health Rate</h3>
                 <p className="text-xs font-bold text-gray-500">Ang porsyento ng Overall Active MT</p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => navigateToFilteredDb('ACTIVE')}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-bold"
+                  >
+                    Active: {dashData.active}
+                  </button>
+                  <button
+                    onClick={() => navigateToFilteredDb('INACTIVE')}
+                    className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs font-bold"
+                  >
+                    Inactive: {dashData.inactive}
+                  </button>
+                </div>
               </div>
             </div>
 

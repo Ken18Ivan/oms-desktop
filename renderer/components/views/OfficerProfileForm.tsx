@@ -374,14 +374,14 @@ export default function OfficerProfileForm({
     return (
         <div className="animate-fadeIn no-print w-full">
             {/* ACTION BAR */}
-            <div className="flex justify-end items-center p-4 md:px-8 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 transition-colors duration-300 gap-3">
+            <div className="flex justify-end items-center p-4 md:px-8 border-b border-stone-200 dark:border-slate-700 bg-stone-50 dark:bg-slate-900 transition-colors duration-300 gap-3">
                 {!formState.isNew && (
-                    <button onClick={() => { setIsPatotooView(false); setShowPrintPreview(true); setPreviewTab('data'); }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-all text-sm uppercase font-black">
+                    <button onClick={() => { setIsPatotooView(false); setShowPrintPreview(true); setPreviewTab('data'); }} className="bg-blue-700 hover:bg-blue-800 text-white py-3 px-8 rounded-xl shadow-md transition-all text-sm font-semibold tracking-wide">
                         Preview (Info & Patotoo)
                     </button>
                 )}
                 {!formState.isNew && (
-                    <button onClick={() => deleteOfficer(formState.id)} className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all text-sm uppercase font-black">
+                    <button onClick={() => deleteOfficer(formState.id)} className="bg-red-700 hover:bg-red-800 text-white py-3 px-6 rounded-xl shadow-md transition-all text-sm font-semibold tracking-wide">
                         Delete
                     </button>
                 )}
@@ -389,34 +389,34 @@ export default function OfficerProfileForm({
 
             {/* FULL WIDTH PROFILE CONTENT */}
             <div className="w-full">
-                <div className="bg-slate-100 dark:bg-slate-800 p-5 md:px-12 border-b border-gray-200 dark:border-slate-700 transition-colors duration-300">
-                    <h3 className="text-base font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide max-w-[1400px] mx-auto">Mga Personal na Impormasyon</h3>
+                <div className="bg-slate-100 dark:bg-slate-800 p-5 md:px-12 border-b border-stone-200 dark:border-slate-700 transition-colors duration-300">
+                    <h3 className="text-lg font-semibold font-serif text-slate-700 dark:text-slate-300 tracking-normal max-w-[1400px] mx-auto">Mga Personal na Impormasyon</h3>
                 </div>
 
-                <div className="p-8 md:px-12 flex flex-col gap-6 w-full max-w-[1400px] mx-auto text-gray-900 dark:text-white uppercase font-black">
+                <div className="p-8 md:px-12 flex flex-col gap-6 w-full max-w-[1400px] mx-auto text-gray-900 dark:text-white font-semibold">
                     {/* Row 1: Registry, Control, Kasarian, Kapisanan */}
                     <div className="flex flex-col md:flex-row gap-4 w-full items-stretch">
                         <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Registry Number <span className="text-gray-400 normal-case">(13-Char)</span> <span className="text-red-500">*</span></label>
-                            {invalidFields.includes('registry') && <div className="flex items-center text-red-500 gap-1"><AlertCircle size={14} /><span className="text-[10px] font-black uppercase">Required</span></div>}
-                            <input type="text" value={formState.registry || ''} onChange={(e) => { handleFormChange('registry', e.target.value); setInvalidFields((prev: any[]) => prev.filter(f => f !== 'registry')); }} maxLength={13} className={`w-full border rounded-lg p-3 outline-none font-mono font-bold uppercase transition-colors ${invalidFields.includes('registry') ? 'border-red-500 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500 text-red-900 dark:text-red-300' : 'border-gray-300 dark:border-slate-600 focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 text-gray-900 dark:text-white'}`} />
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Registry Number <span className="text-gray-400 normal-case">(13-Char)</span> <span className="text-red-500">*</span></label>
+                            {invalidFields.includes('registry') && <div className="flex items-center text-red-500 gap-1"><AlertCircle size={14} /><span className="text-[10px] font-semibold">Required</span></div>}
+                            <input type="text" value={formState.registry || ''} onChange={(e) => { handleFormChange('registry', e.target.value); setInvalidFields((prev: any[]) => prev.filter(f => f !== 'registry')); }} maxLength={13} className={`w-full border rounded-xl p-3 outline-none font-mono font-medium transition-colors ${invalidFields.includes('registry') ? 'border-red-500 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500 text-red-900 dark:text-red-300' : 'border-stone-300 dark:border-slate-600 focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 text-gray-900 dark:text-white'}`} />
                         </div>
                         <div className="w-20">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Control #</label>
-                            {isDuplicateControlNumber && <div className="flex items-center text-red-500 gap-1 mb-2"><AlertCircle size={14} /><span className="text-[10px] font-black uppercase">Control # taken</span></div>}
-                            <input type="text" value={formState.controlNumber || ''} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 4); handleFormChange('controlNumber', val); checkDuplicateControlNumber(val); }} placeholder="0001" maxLength={4} className={`w-full border rounded-lg p-3 outline-none font-mono font-bold uppercase transition-colors ${isDuplicateControlNumber ? 'border-red-500 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500 text-red-900 dark:text-red-300' : 'border-gray-300 dark:border-slate-600 focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 text-gray-900 dark:text-white'}`} />
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Control #</label>
+                            {isDuplicateControlNumber && <div className="flex items-center text-red-500 gap-1 mb-2"><AlertCircle size={14} /><span className="text-[10px] font-semibold">Control # taken</span></div>}
+                            <input type="text" value={formState.controlNumber || ''} onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 4); handleFormChange('controlNumber', val); checkDuplicateControlNumber(val); }} placeholder="0001" maxLength={4} className={`w-full border rounded-xl p-3 outline-none font-mono font-medium transition-colors ${isDuplicateControlNumber ? 'border-red-500 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500 text-red-900 dark:text-red-300' : 'border-stone-300 dark:border-slate-600 focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 text-gray-900 dark:text-white'}`} />
                         </div>
                         <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Kasarian<span className="text-gray-400 normal-case">(Gender)</span></label>
-                            <select value={formState.gender || ''} onChange={(e) => handleFormChange('gender', e.target.value)} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none bg-[#fafafa] dark:bg-slate-900 focus:ring-2 focus:ring-slate-500 font-bold dark:text-white transition-colors text-sm">
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Kasarian<span className="text-gray-400 normal-case">(Gender)</span></label>
+                            <select value={formState.gender || ''} onChange={(e) => handleFormChange('gender', e.target.value)} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none bg-stone-50 dark:bg-slate-900 focus:ring-2 focus:ring-slate-500 font-medium dark:text-white transition-colors text-sm">
                                 <option value="" disabled>PUMILI...</option>
                                 <option value="LALAKI">LALAKI</option>
                                 <option value="BABAE">BABAE</option>
                             </select>
                         </div>
                         <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Kapisanan <span className="text-gray-400 normal-case">(Org)</span></label>
-                            <select value={formState.kapisanan || ''} onChange={(e) => handleFormChange('kapisanan', e.target.value)} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none bg-[#fafafa] dark:bg-slate-900 focus:ring-2 focus:ring-slate-500 font-bold dark:text-white transition-colors text-sm">
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Kapisanan <span className="text-gray-400 normal-case">(Org)</span></label>
+                            <select value={formState.kapisanan || ''} onChange={(e) => handleFormChange('kapisanan', e.target.value)} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none bg-stone-50 dark:bg-slate-900 focus:ring-2 focus:ring-slate-500 font-medium dark:text-white transition-colors text-sm">
                                 <option value="" disabled>PUMILI...</option>
                                 <option value="BUKLOD">BUKLOD</option>
                                 <option value="KADIWA">KADIWA</option>
@@ -428,13 +428,13 @@ export default function OfficerProfileForm({
                     {/* Row 2: Unang Pangalan | Suffix | Apelyido sa Ina */}
                     <div className="flex flex-col md:flex-row gap-4 w-full items-end">
                         <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Unang Pangalan <span className="text-gray-400 normal-case">(First Name)</span> <span className="text-red-500">*</span></label>
-                            {invalidFields.includes('firstName') && <div className="flex items-center text-red-500 gap-1"><AlertCircle size={14} /><span className="text-[10px] font-black uppercase">Required</span></div>}
-                            <input type="text" value={formState.firstName || ''} onChange={(e) => { handleFormChange('firstName', e.target.value); setInvalidFields((prev: any[]) => prev.filter(f => f !== 'firstName')); }} className={`w-full border rounded-lg p-3 outline-none font-bold transition-colors ${invalidFields.includes('firstName') ? 'border-red-500 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500 text-red-900 dark:text-red-300' : 'border-gray-300 dark:border-slate-600 focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 text-gray-900 dark:text-white'}`} />
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">Unang Pangalan <span className="text-gray-400 normal-case">(First Name)</span> <span className="text-red-500">*</span></label>
+                            {invalidFields.includes('firstName') && <div className="flex items-center text-red-500 gap-1"><AlertCircle size={14} /><span className="text-[10px] font-semibold">Required</span></div>}
+                            <input type="text" value={formState.firstName || ''} onChange={(e) => { handleFormChange('firstName', e.target.value); setInvalidFields((prev: any[]) => prev.filter(f => f !== 'firstName')); }} className={`w-full border rounded-xl p-3 outline-none font-medium transition-colors ${invalidFields.includes('firstName') ? 'border-red-500 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500 text-red-900 dark:text-red-300' : 'border-stone-300 dark:border-slate-600 focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 text-gray-900 dark:text-white'}`} />
                         </div>
                         <div className="w-20">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Suffix</label>
-                            <select value={formState.suffix || ''} onChange={(e) => handleFormChange('suffix', e.target.value)} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none bg-[#fafafa] dark:bg-slate-900 focus:ring-2 focus:ring-slate-500 text-gray-900 dark:text-white transition-colors text-sm">
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">Suffix</label>
+                            <select value={formState.suffix || ''} onChange={(e) => handleFormChange('suffix', e.target.value)} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none bg-stone-50 dark:bg-slate-900 focus:ring-2 focus:ring-slate-500 text-gray-900 dark:text-white transition-colors text-sm">
                                 <option value="">(WALA)</option>
                                 <option value="JR.">JR.</option>
                                 <option value="SR.">SR.</option>
@@ -446,37 +446,37 @@ export default function OfficerProfileForm({
                             </select>
                         </div>
                         <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Apelyido sa Ina <span className="text-gray-400 normal-case">(Mother's Surname)</span></label>
-                            <input type="text" value={formState.lastNameMother || ''} onChange={(e) => handleFormChange('lastNameMother', e.target.value)} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 dark:text-white font-bold transition-colors" />
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Apelyido sa Ina <span className="text-gray-400 normal-case">(Mother's Surname)</span></label>
+                            <input type="text" value={formState.lastNameMother || ''} onChange={(e) => handleFormChange('lastNameMother', e.target.value)} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 dark:text-white font-medium transition-colors" />
                         </div>
                     </div>
 
                     {/* Row 3: Apelyido sa Ama | Apelyido sa Asawa | Petsa ng Kapanganakan */}
                     <div className="flex flex-col md:flex-row gap-4 w-full items-end">
                         <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Apelyido sa Ama <span className="text-gray-400 normal-case">(Father's Surname)</span> <span className="text-red-500">*</span></label>
-                            {invalidFields.includes('lastNameFather') && <div className="flex items-center text-red-500 gap-1"><AlertCircle size={14} /><span className="text-[10px] font-black uppercase">Required</span></div>}
-                            <input type="text" value={formState.lastNameFather || ''} onChange={(e) => { handleFormChange('lastNameFather', e.target.value); setInvalidFields((prev: any[]) => prev.filter(f => f !== 'lastNameFather')); }} className={`w-full border rounded-lg p-3 outline-none font-bold transition-colors ${invalidFields.includes('lastNameFather') ? 'border-red-500 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500 text-red-900 dark:text-red-300' : 'border-gray-300 dark:border-slate-600 focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 text-gray-900 dark:text-white'}`} />
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">Apelyido sa Ama <span className="text-gray-400 normal-case">(Father's Surname)</span> <span className="text-red-500">*</span></label>
+                            {invalidFields.includes('lastNameFather') && <div className="flex items-center text-red-500 gap-1"><AlertCircle size={14} /><span className="text-[10px] font-semibold">Required</span></div>}
+                            <input type="text" value={formState.lastNameFather || ''} onChange={(e) => { handleFormChange('lastNameFather', e.target.value); setInvalidFields((prev: any[]) => prev.filter(f => f !== 'lastNameFather')); }} className={`w-full border rounded-xl p-3 outline-none font-medium transition-colors ${invalidFields.includes('lastNameFather') ? 'border-red-500 bg-red-50 dark:bg-red-900/20 focus:ring-2 focus:ring-red-500 text-red-900 dark:text-red-300' : 'border-stone-300 dark:border-slate-600 focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 text-gray-900 dark:text-white'}`} />
                         </div>
                         <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Apelyido sa Asawa <span className="text-gray-400 dark:text-gray-500 normal-case font-normal">(Spouse Surname)</span></label>
-                            <input type="text" value={formState.lastNameSpouse || ''} onChange={(e) => handleFormChange('lastNameSpouse', e.target.value)} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 dark:text-white font-bold transition-colors" />
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Apelyido sa Asawa <span className="text-gray-400 dark:text-gray-500 normal-case font-normal">(Spouse Surname)</span></label>
+                            <input type="text" value={formState.lastNameSpouse || ''} onChange={(e) => handleFormChange('lastNameSpouse', e.target.value)} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 dark:text-white font-medium transition-colors" />
                         </div>
                         <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Petsa ng Kapanganakan <span className="text-gray-400 normal-case">(Birthday)</span></label>
-                            <input type="date" value={formState.bday || ''} onChange={(e) => handleFormChange('bday', e.target.value)} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 font-bold text-gray-700 dark:text-white dark:[color-scheme:dark] transition-colors" />
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Petsa ng Kapanganakan <span className="text-gray-400 normal-case">(Birthday)</span></label>
+                            <input type="date" value={formState.bday || ''} onChange={(e) => handleFormChange('bday', e.target.value)} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 font-medium text-gray-700 dark:text-white dark:[color-scheme:dark] transition-colors" />
                         </div>
                     </div>
 
                     {/* Row 4: Phone | Purok | Grupo */}
                     <div className="flex flex-col md:flex-row gap-4 w-full items-end">
                         <div className="w-56">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Phone <span className="text-gray-400 normal-case">+63</span></label>
-                            <input type="text" value={formState.cellphone || ''} onChange={(e) => handleFormChange('cellphone', e.target.value)} placeholder="9XXXXXXXXX" maxLength={11} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 font-mono font-bold text-gray-900 dark:text-white transition-colors" />
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Phone <span className="text-gray-400 normal-case">+63</span></label>
+                            <input type="text" value={formState.cellphone || ''} onChange={(e) => handleFormChange('cellphone', e.target.value)} placeholder="9XXXXXXXXX" maxLength={11} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 font-mono font-medium text-gray-900 dark:text-white transition-colors" />
                         </div>
                         <div className="w-20">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Purok</label>
-                            <select value={formState.purok || ''} onChange={(e) => { handleFormChange('purok', e.target.value); handleFormChange('grupo', ''); }} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 dark:text-white font-black text-center transition-colors text-base">
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Purok</label>
+                            <select value={formState.purok || ''} onChange={(e) => { handleFormChange('purok', e.target.value); handleFormChange('grupo', ''); }} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 dark:text-white font-semibold text-center transition-colors text-base">
                                 <option value="">PUMILI...</option>
                                 {purokList?.map((purok) => (
                                     <option key={purok.id} value={purok.name}>{purok.name}</option>
@@ -484,8 +484,8 @@ export default function OfficerProfileForm({
                             </select>
                         </div>
                         <div className="w-20">
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Grupo</label>
-                            <select value={formState.grupo || ''} onChange={(e) => handleFormChange('grupo', e.target.value)} disabled={!formState.purok} className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-[#fafafa] dark:bg-slate-900 dark:text-white font-black text-center transition-colors text-base disabled:opacity-50 disabled:cursor-not-allowed">
+                            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Grupo</label>
+                            <select value={formState.grupo || ''} onChange={(e) => handleFormChange('grupo', e.target.value)} disabled={!formState.purok} className="w-full border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none focus:ring-2 focus:ring-slate-500 bg-stone-50 dark:bg-slate-900 dark:text-white font-semibold text-center transition-colors text-base disabled:opacity-50 disabled:cursor-not-allowed">
                                 <option value="">PUMILI...</option>
                                 {(() => {
                                     const selectedPurok = purokList?.find(p => p.name === formState.purok);
@@ -501,9 +501,9 @@ export default function OfficerProfileForm({
                     </div>
 
                     {formState.kapisanan === 'BUKLOD' ? (
-                        <div className="md:col-span-6 bg-rose-50 dark:bg-rose-900/10 p-4 rounded-lg border border-rose-200 dark:border-rose-900 shadow-sm flex items-center gap-6 transition-colors">
-                            <label className="block text-sm font-black text-rose-700 dark:text-rose-400 uppercase whitespace-nowrap">Petsa ng Kasal:</label>
-                            <input type="date" value={formState.petsaKasal || ''} onChange={(e) => handleFormChange('petsaKasal', e.target.value)} className="border border-gray-300 dark:border-slate-600 rounded-md p-3 outline-none focus:ring-2 focus:ring-rose-500 bg-white dark:bg-slate-900 font-bold text-gray-700 dark:text-white dark:[color-scheme:dark] transition-colors" />
+                        <div className="md:col-span-6 bg-rose-50 dark:bg-rose-900/10 p-4 rounded-xl border border-rose-200 dark:border-rose-900 shadow-sm flex items-center gap-6 transition-colors">
+                            <label className="block text-sm font-semibold text-rose-700 dark:text-rose-400 whitespace-nowrap">Petsa ng Kasal:</label>
+                            <input type="date" value={formState.petsaKasal || ''} onChange={(e) => handleFormChange('petsaKasal', e.target.value)} className="border border-stone-300 dark:border-slate-600 rounded-xl p-3 outline-none focus:ring-2 focus:ring-rose-500 bg-white dark:bg-slate-900 font-medium text-gray-700 dark:text-white dark:[color-scheme:dark] transition-colors" />
                         </div>
                     ) : (
                         <div className="md:col-span-6"></div>
@@ -512,22 +512,22 @@ export default function OfficerProfileForm({
 
                 </div>
 
-                <div className="bg-gray-800 dark:bg-slate-950 p-6 md:px-12 border-y border-gray-700 dark:border-slate-800 mt-2 flex justify-between items-center transition-colors duration-300">
-                    <h3 className="text-base font-bold text-white tracking-wide uppercase max-w-[1400px] w-full mx-auto flex justify-between items-center">
+                <div className="bg-slate-700 dark:bg-slate-950 p-6 md:px-12 border-y border-slate-600 dark:border-slate-800 mt-2 flex justify-between items-center transition-colors duration-300">
+                    <h3 className="text-lg font-semibold font-serif text-white tracking-normal max-w-[1400px] w-full mx-auto flex justify-between items-center">
                         Hawak Na Tungkulin
-                        <button onClick={addTungkulinRow} className="bg-white dark:bg-slate-700 text-gray-800 dark:text-white text-sm font-bold py-2 px-5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 shadow-sm transition-all">+ ADD TUNGKULIN ROW</button>
+                        <button onClick={addTungkulinRow} className="bg-white dark:bg-slate-700 text-gray-800 dark:text-white text-sm font-semibold py-2 px-5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 shadow-sm transition-all">+ Add Tungkulin Row</button>
                     </h3>
                 </div>
 
                 <div className="w-full border-b dark:border-slate-700 px-4 md:px-12">
                     {/* HEADER ROW */}
-                    <div className="grid grid-cols-[60px_1fr_180px_1.3fr_160px_90px_50px] gap-0 bg-gray-100 dark:bg-slate-900 text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wider rounded-t-lg border-2 border-gray-200 dark:border-slate-700 font-black">
-                        <div className="text-center p-3 border-r-2 border-gray-300 dark:border-slate-700">No</div>
-                        <div className="p-3 border-r-2 border-gray-300 dark:border-slate-700">Tungkulin</div>
-                        <div className="text-center p-3 border-r-2 border-gray-300 dark:border-slate-700">URI / TYPE</div>
-                        <div className="text-center p-3 border-r-2 border-gray-300 dark:border-slate-700 bg-green-50/50 dark:bg-green-900/10">Remarks</div>
-                        <div className="text-center p-3 border-r-2 border-gray-300 dark:border-slate-700 font-black">Status</div>
-                        <div className="text-center p-3 border-r-2 border-gray-300 dark:border-slate-700 font-black">Code</div>
+                    <div className="grid grid-cols-[60px_1fr_180px_1.3fr_160px_90px_50px] gap-0 bg-stone-100 dark:bg-slate-900 text-sm text-gray-700 dark:text-gray-300 tracking-wide rounded-t-xl border border-stone-300 dark:border-slate-700 font-semibold">
+                        <div className="text-center p-3 border-r border-stone-300 dark:border-slate-700">No</div>
+                        <div className="p-3 border-r border-stone-300 dark:border-slate-700">Tungkulin</div>
+                        <div className="text-center p-3 border-r border-stone-300 dark:border-slate-700">Uri / Type</div>
+                        <div className="text-center p-3 border-r border-stone-300 dark:border-slate-700 bg-green-50/40 dark:bg-green-900/10">Remarks</div>
+                        <div className="text-center p-3 border-r border-stone-300 dark:border-slate-700">Status</div>
+                        <div className="text-center p-3 border-r border-stone-300 dark:border-slate-700">Code</div>
                         <div className="text-center p-3">Del</div>
                     </div>
 
@@ -550,12 +550,12 @@ export default function OfficerProfileForm({
                             const rowFocusedIndex = activeDropdown?.id === tungkulin.id ? focusedIndex : -1;
 
                             return (
-                                <div key={tungkulin.id} className="grid grid-cols-[60px_1fr_180px_1.3fr_160px_90px_50px] gap-0 border-2 border-t-0 border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors font-black uppercase text-sm text-gray-900 dark:text-white items-stretch">
+                                <div key={tungkulin.id} className="grid grid-cols-[60px_1fr_180px_1.3fr_160px_90px_50px] gap-0 border border-t-0 border-stone-300 dark:border-slate-700 hover:bg-stone-50 dark:hover:bg-slate-800 transition-colors font-semibold text-sm text-gray-900 dark:text-white items-stretch">
                                     {/* NO */}
-                                    <div className="text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-900 p-2 border-r-2 border-gray-200 dark:border-slate-700 flex items-center justify-center font-mono text-sm">{index + 1}</div>
+                                    <div className="text-center text-gray-500 dark:text-gray-400 bg-stone-50 dark:bg-slate-900 p-2 border-r border-stone-300 dark:border-slate-700 flex items-center justify-center font-mono text-sm">{index + 1}</div>
 
                                     {/* TUNGKULIN */}
-                                    <div className="relative border-r-2 border-gray-200 dark:border-slate-700 p-2 flex items-center">
+                                    <div className="relative border-r border-stone-300 dark:border-slate-700 p-2 flex items-center">
                                         <input
                                             type="text"
                                             value={tungkulin.name || ''}
@@ -588,7 +588,7 @@ export default function OfficerProfileForm({
                                                     handleKeyDown(e, tungkulin.id, tungkulin.name);
                                                 }
                                             }}
-                                            className="w-full p-2 text-lg outline-none border border-gray-300 dark:border-slate-600 rounded font-black text-gray-800 dark:text-white uppercase focus:ring-2 focus:ring-slate-500 bg-white dark:bg-slate-900 transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                            className="w-full p-2 text-lg outline-none border border-stone-300 dark:border-slate-600 rounded-lg font-semibold text-gray-800 dark:text-white focus:ring-2 focus:ring-slate-500 bg-white dark:bg-slate-900 transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                         />
                                         {activeDropdown?.id === tungkulin.id && activeDropdown?.field === 'name' && currentSuggestions.length > 0 && (
                                             <div className="absolute z-[100] left-0 w-full mb-1 bottom-full bg-white dark:bg-slate-800 border-4 border-slate-600 shadow-2xl rounded-lg max-h-72 overflow-y-auto" id={`dropdown-${tungkulin.id}`}>
@@ -597,7 +597,7 @@ export default function OfficerProfileForm({
                                                         key={`${opt}-${i}`}
                                                         ref={rowFocusedIndex === i ? (el: any) => el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) : null}
                                                         onMouseDown={() => handleTungkulinChange(tungkulin.id, 'name', opt)}
-                                                        className={`p-3 text-base cursor-pointer font-bold uppercase border-b border-gray-100 dark:border-slate-700 last:border-0 transition-colors
+                                                        className={`p-3 text-base cursor-pointer font-semibold border-b border-gray-100 dark:border-slate-700 last:border-0 transition-colors
                                 ${rowFocusedIndex === i ? 'bg-slate-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`
                                                         }
                                                     >
@@ -609,48 +609,48 @@ export default function OfficerProfileForm({
                                     </div>
 
                                     {/* URI */}
-                                    <div className="border-r-2 border-gray-200 dark:border-slate-700 p-2 flex items-center">
-                                        <select value={tungkulin.scope || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'scope', e.target.value)} className="w-full p-2.5 text-sm outline-none border border-gray-300 dark:border-slate-600 rounded font-black uppercase focus:ring-2 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-colors whitespace-nowrap">
-                                            <option value="PANLOKAL">PANLOKAL</option>
-                                            <option value="PANDISTRITO">PANDISTRITO</option>
+                                    <div className="border-r border-stone-300 dark:border-slate-700 p-2 flex items-center">
+                                        <select value={tungkulin.scope || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'scope', e.target.value)} className="w-full p-2.5 text-sm outline-none border border-stone-300 dark:border-slate-600 rounded-lg font-semibold focus:ring-2 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-colors whitespace-nowrap">
+                                            <option value="PANLOKAL">Panlokal</option>
+                                            <option value="PANDISTRITO">Pandistrito</option>
                                         </select>
                                     </div>
 
                                     {/* REMARKS */}
-                                    <div className="bg-white dark:bg-slate-900 p-2 border-r-2 border-gray-200 dark:border-slate-700 flex flex-col gap-1.5 justify-center">
+                                    <div className="bg-white dark:bg-slate-900 p-2 border-r border-stone-300 dark:border-slate-700 flex flex-col gap-1.5 justify-center">
                                         <div className="flex items-center gap-1 px-2 py-1.5 bg-green-50 dark:bg-green-900/10 rounded border border-green-200 dark:border-green-800 transition-colors">
-                                            <span className="font-black text-green-700 dark:text-green-500 uppercase text-[12px]">Petsa Nanumpa:</span>
-                                            <select value={tungkulin.inOathRef || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inOathRef', e.target.value)} className="w-20 p-1 text-[12px] font-black outline-none border border-green-300 dark:border-green-800 rounded bg-white dark:bg-slate-900 text-green-800 dark:text-green-400 focus:ring-1 focus:ring-slate-500 transition-colors">
-                                                <option value="">TYPE</option>
+                                            <span className="font-semibold text-green-700 dark:text-green-500 text-[12px]">Petsa Nanumpa:</span>
+                                            <select value={tungkulin.inOathRef || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inOathRef', e.target.value)} className="w-20 p-1 text-[12px] font-semibold outline-none border border-green-300 dark:border-green-800 rounded bg-white dark:bg-slate-900 text-green-800 dark:text-green-400 focus:ring-1 focus:ring-slate-500 transition-colors">
+                                                <option value="">Type</option>
                                                 <option value="R5-04">R5-04</option>
                                                 <option value="R5-15">R5-15</option>
                                             </select>
                                             <div className="flex-1 flex items-center">
-                                                <input type="date" value={tungkulin.inOathDate || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inOathDate', e.target.value)} className="w-full p-1 text-[12px] outline-none border border-green-300 dark:border-green-800 rounded-l bg-white dark:bg-slate-900 font-black text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-slate-500 dark:[color-scheme:dark] transition-colors" />
+                                                <input type="date" value={tungkulin.inOathDate || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inOathDate', e.target.value)} className="w-full p-1 text-[12px] outline-none border border-green-300 dark:border-green-800 rounded-l bg-white dark:bg-slate-900 font-medium text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-slate-500 dark:[color-scheme:dark] transition-colors" />
                                                 {tungkulin.inOathDate && (
-                                                    <button onClick={() => handleTungkulinChange(tungkulin.id, 'inOathDate', '')} className="px-2 py-1 text-[12px] font-black text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded-r hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">✕</button>
+                                                    <button onClick={() => handleTungkulinChange(tungkulin.id, 'inOathDate', '')} className="px-2 py-1 text-[12px] font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded-r hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">✕</button>
                                                 )}
                                             </div>
                                         </div>
 
                                         <div className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/10 rounded border border-blue-200 dark:border-blue-800 transition-colors">
-                                            <span className="font-black text-blue-700 dark:text-blue-500 uppercase text-[12px]">Petsa Nag-IN:</span>
-                                            <select value={tungkulin.inOathRef === 'R2-04 IN' ? 'R2-04 IN' : ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inOathRef', e.target.value === 'R2-04 IN' ? 'R2-04 IN' : tungkulin.inOathRef)} className="w-20 p-1 text-[12px] font-black outline-none border border-blue-300 dark:border-blue-800 rounded bg-white dark:bg-slate-900 text-blue-800 dark:text-blue-400 focus:ring-1 focus:ring-slate-500 transition-colors">
-                                                <option value="">TYPE</option>
+                                            <span className="font-semibold text-blue-700 dark:text-blue-500 text-[12px]">Petsa Nag-IN:</span>
+                                            <select value={tungkulin.inOathRef === 'R2-04 IN' ? 'R2-04 IN' : ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inOathRef', e.target.value === 'R2-04 IN' ? 'R2-04 IN' : tungkulin.inOathRef)} className="w-20 p-1 text-[12px] font-semibold outline-none border border-blue-300 dark:border-blue-800 rounded bg-white dark:bg-slate-900 text-blue-800 dark:text-blue-400 focus:ring-1 focus:ring-slate-500 transition-colors">
+                                                <option value="">Type</option>
                                                 <option value="R2-04 IN">R2-04 IN</option>
                                             </select>
                                             <div className="flex-1 flex items-center">
-                                                <input type="date" value={tungkulin.inDate || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inDate', e.target.value)} className="w-full p-1 text-[12px] outline-none border border-blue-300 dark:border-blue-800 rounded-l bg-white dark:bg-slate-900 font-black text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-slate-500 dark:[color-scheme:dark] transition-colors" />
+                                                <input type="date" value={tungkulin.inDate || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inDate', e.target.value)} className="w-full p-1 text-[12px] outline-none border border-blue-300 dark:border-blue-800 rounded-l bg-white dark:bg-slate-900 font-medium text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-slate-500 dark:[color-scheme:dark] transition-colors" />
                                                 {tungkulin.inDate && (
-                                                    <button onClick={() => handleTungkulinChange(tungkulin.id, 'inDate', '')} className="px-2 py-1 text-[12px] font-black text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded-r hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">✕</button>
+                                                    <button onClick={() => handleTungkulinChange(tungkulin.id, 'inDate', '')} className="px-2 py-1 text-[12px] font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded-r hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">✕</button>
                                                 )}
                                             </div>
                                         </div>
 
                                         <div className="flex items-center gap-1 px-2 py-1.5 bg-red-50 dark:bg-red-900/10 rounded border border-red-200 dark:border-red-800 transition-colors">
-                                            <span className="font-black text-red-700 dark:text-red-400 uppercase text-[12px]">Petsa Nabawas/OUT:</span>
-                                            <select value={tungkulin.outDropRef || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'outDropRef', e.target.value)} className="w-20 p-1 text-[12px] font-black outline-none border border-red-300 dark:border-red-800 rounded bg-white dark:bg-slate-900 text-red-800 dark:text-red-400 focus:ring-1 focus:ring-rose-500 transition-colors">
-                                                <option value="">TYPE</option>
+                                            <span className="font-semibold text-red-700 dark:text-red-400 text-[12px]">Petsa Nabawas/OUT:</span>
+                                            <select value={tungkulin.outDropRef || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'outDropRef', e.target.value)} className="w-20 p-1 text-[12px] font-semibold outline-none border border-red-300 dark:border-red-800 rounded bg-white dark:bg-slate-900 text-red-800 dark:text-red-400 focus:ring-1 focus:ring-rose-500 transition-colors">
+                                                <option value="">Type</option>
                                                 <option value="R5-04a">R5-04a</option>
                                                 <option value="R5-15a">R5-15a</option>
                                                 <option value="R2-04 OUT">R2-04 OUT</option>
@@ -658,30 +658,30 @@ export default function OfficerProfileForm({
                                                 <option value="R2-09">R2-09</option>
                                             </select>
                                             <div className="flex-1 flex items-center">
-                                                <input type="date" value={tungkulin.outDropDate || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'outDropDate', e.target.value)} className="w-full p-1 text-[12px] outline-none border border-red-300 dark:border-red-800 rounded-l bg-white dark:bg-slate-900 font-black text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-rose-500 dark:[color-scheme:dark] transition-colors" />
+                                                <input type="date" value={tungkulin.outDropDate || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'outDropDate', e.target.value)} className="w-full p-1 text-[12px] outline-none border border-red-300 dark:border-red-800 rounded-l bg-white dark:bg-slate-900 font-medium text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-rose-500 dark:[color-scheme:dark] transition-colors" />
                                                 {tungkulin.outDropDate && (
-                                                    <button onClick={() => handleTungkulinChange(tungkulin.id, 'outDropDate', '')} className="px-2 py-1 text-[12px] font-black text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded-r hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">✕</button>
+                                                    <button onClick={() => handleTungkulinChange(tungkulin.id, 'outDropDate', '')} className="px-2 py-1 text-[12px] font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded-r hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">✕</button>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* STATUS */}
-                                    <div className="border-r-2 border-gray-200 dark:border-slate-700 p-2 flex items-center">
+                                    <div className="border-r border-stone-300 dark:border-slate-700 p-2 flex items-center">
                                         <div className="flex flex-col gap-1 w-full">
-                                            <select value={tungkulin.status || 'ACTIVE'} onChange={(e) => handleTungkulinChange(tungkulin.id, 'status', e.target.value)} className={`w-full p-2.5 rounded text-sm font-black uppercase focus:ring-1 focus:ring-gray-400 dark:bg-slate-900 outline-none transition-colors whitespace-nowrap overflow-visible ${tungkulin.status === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800'}`}>
-                                                <option value="ACTIVE">ACTIVE</option>
-                                                <option value="INACTIVE">INACTIVE</option>
+                                            <select value={tungkulin.status || 'ACTIVE'} onChange={(e) => handleTungkulinChange(tungkulin.id, 'status', e.target.value)} className={`w-full p-2.5 rounded-lg text-sm font-semibold focus:ring-1 focus:ring-gray-400 dark:bg-slate-900 outline-none transition-colors whitespace-nowrap overflow-visible ${tungkulin.status === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800'}`}>
+                                                <option value="ACTIVE">Active</option>
+                                                <option value="INACTIVE">Inactive</option>
                                             </select>
                                             {tungkulin.status === 'INACTIVE' && (
-                                                <input type="date" value={tungkulin.inactiveDate || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inactiveDate', e.target.value)} className="w-full p-1 text-[12px] outline-none border border-red-300 dark:border-red-800 rounded font-black text-red-800 dark:text-red-400 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-rose-500 dark:[color-scheme:dark] transition-colors" title="Petsa ng pagka-inactive" />
+                                                <input type="date" value={tungkulin.inactiveDate || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'inactiveDate', e.target.value)} className="w-full p-1 text-[12px] outline-none border border-red-300 dark:border-red-800 rounded font-medium text-red-800 dark:text-red-400 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-rose-500 dark:[color-scheme:dark] transition-colors" title="Petsa ng pagka-inactive" />
                                             )}
                                         </div>
                                     </div>
 
                                     {/* CODE */}
-                                    <div className="border-r-2 border-gray-200 dark:border-slate-700 p-2 flex items-center">
-                                        <input type="text" value={tungkulin.code || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'code', e.target.value)} className="w-full p-2 text-lg font-black outline-none border border-gray-300 dark:border-slate-600 rounded font-mono uppercase focus:ring-2 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-colors text-center" title="Remarks/Code" />
+                                    <div className="border-r border-stone-300 dark:border-slate-700 p-2 flex items-center">
+                                        <input type="text" value={tungkulin.code || ''} onChange={(e) => handleTungkulinChange(tungkulin.id, 'code', e.target.value)} className="w-full p-2 text-lg font-semibold outline-none border border-stone-300 dark:border-slate-600 rounded-lg font-mono focus:ring-2 focus:ring-slate-500 bg-white dark:bg-slate-900 dark:text-white transition-colors text-center" title="Remarks/Code" />
                                     </div>
 
                                     {/* DELETE */}
@@ -696,7 +696,7 @@ export default function OfficerProfileForm({
                                                     isDestructive: true
                                                 });
                                             }}
-                                            className="bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded w-8 h-8 flex items-center justify-center font-black text-sm transition-colors shadow-sm"
+                                            className="bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded w-8 h-8 flex items-center justify-center font-semibold text-sm transition-colors shadow-sm"
                                             title="Burahin ang row"
                                         >
                                             ×
@@ -708,15 +708,15 @@ export default function OfficerProfileForm({
                     </div>
                 </div>
 
-                <div className="p-6 md:px-12 bg-gray-100 dark:bg-slate-950 flex justify-between items-center w-full transition-colors duration-300">
+                <div className="p-6 md:px-12 bg-stone-100 dark:bg-slate-950 flex justify-between items-center w-full transition-colors duration-300">
                     <div>
                         {formState.lastModified && (
-                            <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 tracking-wide">
                                 Last modified: {new Date(formState.lastModified).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                             </p>
                         )}
                     </div>
-                    <button onClick={saveOfficer} className="px-12 py-4 rounded-lg font-black text-white bg-slate-700 hover:bg-slate-800 shadow-lg transition-all tracking-wide uppercase">SAVE RECORD</button>
+                    <button onClick={saveOfficer} className="px-12 py-4 rounded-xl font-semibold text-white bg-slate-700 hover:bg-slate-800 shadow-lg transition-all tracking-wide">Save Record</button>
                 </div>
             </div>
 
@@ -1064,7 +1064,7 @@ export default function OfficerProfileForm({
 
             {/* NOTIFICATION */}
             {notification && (
-                <div className={`fixed bottom-6 right-6 z-[100] px-6 py-4 rounded-xl shadow-lg font-bold text-white uppercase text-sm transition-all animate-slideUp whitespace-pre-wrap ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+                <div className={`fixed bottom-6 right-6 z-[100] px-6 py-4 rounded-xl shadow-lg font-semibold text-white text-sm transition-all animate-slideUp whitespace-pre-wrap ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
                     {notification.message}
                 </div>
             )}

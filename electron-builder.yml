@@ -1,12 +1,17 @@
-appId: com.example.nextron
-productName: My Nextron App
-copyright: Copyright © 2026 Yoshihide Shiono
+appId: com.iligan.oms
+productName: OMS Portal
+copyright: Copyright © 2026 005Production
 directories:
   output: dist
   buildResources: resources
 files:
-  - from: .
-    filter:
-      - package.json
-      - app
+  - main/**/*
+  - app/**/*
+  - resources/**/*
+extraMetadata:
+  main: app/main.js
+win:
+  icon: resources/logo.ico
+  target:
+    - nsis
 publish: null
