@@ -8,7 +8,7 @@ interface IpcHandler {
 
 declare global {
   interface Window {
-    ipc: IpcHandler;
+    ipc?: IpcHandler;
   }
 }
 
@@ -39,6 +39,11 @@ interface ConfirmModalState {
 }
 
 interface OMSContextValue {
+  runtimeMode: 'electron' | 'browser';
+  isIpcReady: boolean;
+  runtimeHint: string;
+  copyDiagnostics: () => Promise<void>;
+
   // Auth
   isLoaded: boolean;
   isAuthenticated: boolean;
@@ -223,6 +228,43 @@ export function useOMS(): OMSContextValue {
 // PROVIDER
 // ============================================================
 export function OMSProvider({ children }: { children: React.ReactNode }) {
+
+  const getRuntimeStatus = () => {
+    if (typeof window === 'undefined') {
+      return {
+        runtimeMode: 'browser' as const,
+        isIpcReady: false,
+        runtimeHint: 'Renderer is loading. Please wait.',
+      };
+    }
+
+    const isElectronUserAgent = /Electron/i.test(window.navigator.userAgent || '');
+    const hasIpcBridge = typeof window.ipc?.invoke === 'function';
+
+    if (hasIpcBridge) {
+      return {
+        runtimeMode: 'electron' as const,
+        isIpcReady: true,
+        runtimeHint: 'Electron runtime detected. IPC bridge is active.',
+      };
+    }
+
+    if (isElectronUserAgent) {
+      return {
+        runtimeMode: 'electron' as const,
+        isIpcReady: false,
+        runtimeHint: 'Electron detected but IPC bridge is unavailable. Reinstall using the latest setup installer.',
+      };
+    }
+
+    return {
+      runtimeMode: 'browser' as const,
+      isIpcReady: false,
+      runtimeHint: 'Browser mode detected. Launch the desktop Electron app to enable local database features.',
+    };
+  };
+
+  const runtimeStatus = getRuntimeStatus();
 
   // ── Auth ──────────────────────────────────────────────────
   const [isLoaded, setIsLoaded] = useState(false);
@@ -438,6 +480,12 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   const [debugLog, setDebugLog] = useState('System Ready');
 
   useEffect(() => {
+    if (!runtimeStatus.isIpcReady) {
+      setDebugLog(`RUNTIME: ${runtimeStatus.runtimeHint}`);
+    }
+  }, [runtimeStatus.isIpcReady, runtimeStatus.runtimeHint]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('oms_custom_path');
       if (saved) setSaveLocation(saved);
@@ -446,6 +494,12 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
 
   const saveToBackend = async (updatedOfficers: any[], updatedDepts: any[], updatedPuroks: any[] = purokList) => {
     try {
+      if (!window.ipc) {
+        const msg = `IPC unavailable. ${runtimeStatus.runtimeHint}`;
+        setDebugLog(`ERROR: ${msg}`);
+        showToast(msg, 'error');
+        return;
+      }
       let path = saveLocation;
       if (path === 'Documents (Default)' && typeof window !== 'undefined') path = localStorage.getItem('oms_custom_path') || '';
       const result = await window.ipc.invoke('save-db', {
@@ -453,6 +507,10 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
         customPath: path
       });
       if (!result?.success) showToast('Save failed: ' + (result?.error || 'Unknown error'), 'error');
+      if (result?.warning) {
+        setDebugLog(`WARN: ${result.warning}`);
+        showToast(result.warning, 'error');
+      }
     } catch (err) {
       showToast('IPC communication error', 'error');
     }
@@ -461,7 +519,7 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   const handleFolderPick = async () => {
     try {
       if (!window.ipc) {
-        setDebugLog('ERROR: IPC not available. Make sure the app is running in Electron.');
+        setDebugLog(`ERROR: IPC not available. ${runtimeStatus.runtimeHint}`);
         return;
       }
       const folderPath = await window.ipc.invoke('select-folder');
@@ -474,6 +532,10 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
           if (loadResult.data.departments) setDepartments(loadResult.data.departments);
           if (loadResult.data.puroks) setPurokList(loadResult.data.puroks);
           setDebugLog('SUCCESS: Database loaded from ' + folderPath);
+          if (loadResult.warning) {
+            setDebugLog(`WARN: ${loadResult.warning}`);
+            showToast(loadResult.warning, 'error');
+          }
         }
         if (folderPath) {
           setDebugLog('Folder selected. Will save new database here: ' + folderPath);
@@ -488,7 +550,7 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   const handleLoadDatabase = async () => {
     try {
       if (!window.ipc) {
-        showToast('❌ System Error: IPC not available.', 'error');
+        showToast(`❌ System Error: IPC not available. ${runtimeStatus.runtimeHint}`, 'error');
         return;
       }
       const folderPath = await window.ipc.invoke('select-folder');
@@ -500,6 +562,10 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
           if (result.data.officers) setOfficers(result.data.officers);
           if (result.data.departments) setDepartments(result.data.departments);
           if (result.data.puroks) setPurokList(result.data.puroks);
+          if (result.warning) {
+            setDebugLog(`WARN: ${result.warning}`);
+            showToast(result.warning, 'error');
+          }
           showToast('✅ Matagumpay na nai-load ang mga record!');
         } else {
           showToast('❌ Walang nakitang record sa folder na ito.', 'error');
@@ -507,6 +573,54 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       showToast('❌ System Error: Hindi ma-load ang file.', 'error');
+    }
+  };
+
+  const copyDiagnostics = async () => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      let appVersion = 'unavailable';
+      if (window.ipc) {
+        try {
+          const versionResult = await window.ipc.invoke('get-app-version');
+          if (versionResult?.success && versionResult?.version) {
+            appVersion = String(versionResult.version);
+          }
+        } catch {
+          appVersion = 'ipc-error';
+        }
+      }
+
+      const diagnostics = [
+        'OMS Diagnostics',
+        `timestamp: ${new Date().toISOString()}`,
+        `runtimeMode: ${runtimeStatus.runtimeMode}`,
+        `isIpcReady: ${runtimeStatus.isIpcReady}`,
+        `runtimeHint: ${runtimeStatus.runtimeHint}`,
+        `appVersion: ${appVersion}`,
+        `userAgent: ${window.navigator.userAgent}`,
+      ].join('\n');
+
+      if (window.navigator.clipboard?.writeText) {
+        await window.navigator.clipboard.writeText(diagnostics);
+      } else {
+        const fallback = document.createElement('textarea');
+        fallback.value = diagnostics;
+        fallback.style.position = 'fixed';
+        fallback.style.opacity = '0';
+        document.body.appendChild(fallback);
+        fallback.focus();
+        fallback.select();
+        document.execCommand('copy');
+        document.body.removeChild(fallback);
+      }
+
+      setDebugLog('SUCCESS: Diagnostics copied to clipboard.');
+      showToast('Diagnostics copied. Send it for support review.', 'success');
+    } catch (err: any) {
+      setDebugLog(`ERROR: Failed to copy diagnostics. ${err?.message || 'Unknown error'}`);
+      showToast('Failed to copy diagnostics.', 'error');
     }
   };
 
@@ -752,6 +866,11 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
       }
 
       setOfficers(newList);
+
+      if (!window.ipc) {
+        showToast(`❌ IPC unavailable. ${runtimeStatus.runtimeHint}`, 'error');
+        return;
+      }
 
       let path = saveLocation;
       if (path === 'Documents (Default)' && typeof window !== 'undefined') path = localStorage.getItem('oms_custom_path') || '';
@@ -1200,6 +1319,11 @@ export function OMSProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value: OMSContextValue = {
+    runtimeMode: runtimeStatus.runtimeMode,
+    isIpcReady: runtimeStatus.isIpcReady,
+    runtimeHint: runtimeStatus.runtimeHint,
+    copyDiagnostics,
+
     isLoaded, isAuthenticated, setIsAuthenticated,
     usernameInput, setUsernameInput,
     currentUsername, setCurrentUsername,

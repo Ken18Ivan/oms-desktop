@@ -5,8 +5,11 @@ const ALLOWED_CHANNELS = [
   'save-db',
   'load-db',
   'select-directory',
+  'select-folder',
   'print-to-pdf',
-  'save-pdf-dialog'
+  'save-pdf-dialog',
+  'save-file',
+  'get-app-version'
 ];
 
 const handler = {
@@ -26,6 +29,6 @@ export type IpcHandler = typeof handler
 
 declare global {
   interface Window {
-    ipc: IpcHandler;
+    ipc?: IpcHandler;
   }
 }

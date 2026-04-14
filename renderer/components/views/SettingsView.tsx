@@ -11,6 +11,10 @@ interface SettingsViewProps {
   setSaveLocation: (val: string) => void;
   handleFolderPick: () => void;
   handleLoadDatabase: () => void;
+  runtimeMode: 'electron' | 'browser';
+  isIpcReady: boolean;
+  runtimeHint: string;
+  copyDiagnostics: () => Promise<void>;
   debugLog: string;
   newDeptName: string;
   setNewDeptName: (val: string) => void;
@@ -70,6 +74,7 @@ export default function SettingsView({
   showToast, downloadBackup,
   saveLocation, setSaveLocation,
   handleFolderPick, handleLoadDatabase,
+  runtimeMode, isIpcReady, runtimeHint, copyDiagnostics,
   debugLog,
   newDeptName, setNewDeptName,
   newDeptTarget, setNewDeptTarget,
@@ -344,6 +349,18 @@ export default function SettingsView({
           >
             📂 Load Existing Records
           </button>
+          <button
+            onClick={copyDiagnostics}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all"
+          >
+            Copy Diagnostics
+          </button>
+        </div>
+        <div className="mt-4 rounded-md border border-amber-300/40 bg-amber-100/50 dark:bg-amber-900/20 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+            Runtime: {runtimeMode === 'electron' ? (isIpcReady ? 'Electron + IPC Ready' : 'Electron + IPC Missing') : 'Browser Mode'}
+          </p>
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-100/90">{runtimeHint}</p>
         </div>
         <p className="mt-4 p-2 bg-black text-red-500 text-xs font-mono font-bold rounded">
           {'>'} LOG: {debugLog}

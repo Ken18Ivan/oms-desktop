@@ -16,6 +16,8 @@ import { X, Menu, User } from 'lucide-react';
 // ── Inner app (uses context) ─────────────────────────────────
 function AppShell() {
   const {
+    runtimeMode, isIpcReady, runtimeHint,
+    copyDiagnostics,
     isLoaded, isAuthenticated, setIsAuthenticated,
     usernameInput, setUsernameInput,
     currentUsername, setCurrentUsername,
@@ -128,6 +130,42 @@ function AppShell() {
     );
   }
 
+  if (runtimeMode === 'electron' && !isIpcReady) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] text-white flex items-center justify-center px-6">
+        <div className="w-full max-w-2xl rounded-2xl border border-amber-300/40 bg-white/10 backdrop-blur-lg p-8 shadow-2xl">
+          <h1 className="text-2xl font-black uppercase tracking-wide text-amber-200">Startup Health Check Failed</h1>
+          <p className="mt-3 text-sm text-amber-100/90 leading-relaxed">{runtimeHint}</p>
+
+          <div className="mt-6 rounded-lg bg-black/30 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-200">Fix Steps</p>
+            <ol className="mt-3 list-decimal list-inside space-y-2 text-sm text-slate-100">
+              <li>Close this app and uninstall old OMS versions.</li>
+              <li>Install the latest setup package again.</li>
+              <li>Launch from the new Start Menu shortcut only.</li>
+              <li>If still failing, click Copy Diagnostics and send it to support.</li>
+            </ol>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={copyDiagnostics}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-5 rounded-lg shadow-md transition-all"
+            >
+              Copy Diagnostics
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-3 px-5 rounded-lg shadow-md transition-all"
+            >
+              Retry Startup
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Login screen ──────────────────────────────────────────
   if (!isAuthenticated) {
     return (
@@ -139,6 +177,9 @@ function AppShell() {
         showPassword={showPassword}
         setShowPassword={setShowPassword}
         authError={authError}
+        runtimeMode={runtimeMode}
+        isIpcReady={isIpcReady}
+        runtimeHint={runtimeHint}
         handleLogin={handleLogin}
       />
     );
@@ -467,6 +508,8 @@ function AppShell() {
               showToast={showToast} downloadBackup={downloadBackup}
               saveLocation={saveLocation} setSaveLocation={setSaveLocation}
               handleFolderPick={handleFolderPick} handleLoadDatabase={handleLoadDatabase}
+              runtimeMode={runtimeMode} isIpcReady={isIpcReady} runtimeHint={runtimeHint}
+              copyDiagnostics={copyDiagnostics}
               debugLog={debugLog} newDeptName={newDeptName} setNewDeptName={setNewDeptName}
               newDeptTarget={newDeptTarget} setNewDeptTarget={setNewDeptTarget}
               addDepartment={addDepartment} departments={departments}

@@ -5,7 +5,7 @@ interface IpcHandler {
 
 declare global {
   interface Window {
-    ipc: IpcHandler;
+    ipc?: IpcHandler;
   }
 }
 

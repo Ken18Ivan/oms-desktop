@@ -2,6 +2,7 @@ import { app, ipcMain, dialog, Menu, BrowserWindow } from 'electron';
 import serve from 'electron-serve';
 import { createWindow } from './helpers/create-window';
 import * as fs from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,6 +50,7 @@ app.on('window-all-closed', () => {
 
 // Config path
 const configPath = path.join(app.getPath('userData'), 'oms-config.json');
+const fallbackDataDir = path.join(app.getPath('userData'), 'OMSData');
 
 // Helpers
 const getRememberedPath = async () => {
@@ -67,6 +69,53 @@ const setRememberedPath = async (folderPath: string) => {
   await fs.writeFile(configPath, JSON.stringify({ savedFolder: folderPath }));
 };
 
+const ensureWritableDirectory = async (dirPath: string) => {
+  const resolved = path.resolve(dirPath);
+  await fs.mkdir(resolved, { recursive: true });
+  await fs.access(resolved, fsConstants.W_OK);
+  return resolved;
+};
+
+const resolveSaveFolder = async (customPath?: string) => {
+  const rememberedPath = await getRememberedPath();
+  const docsPath = app.getPath('documents');
+
+  const candidates = customPath
+    ? [path.resolve(customPath), rememberedPath, docsPath, fallbackDataDir]
+    : [rememberedPath, docsPath, fallbackDataDir];
+
+  const uniqueCandidates = candidates.filter(Boolean) as string[];
+  const dedupedCandidates = [...new Set(uniqueCandidates.map((p) => path.resolve(p)))];
+
+  for (let i = 0; i < dedupedCandidates.length; i++) {
+    const candidate = dedupedCandidates[i];
+    try {
+      const writablePath = await ensureWritableDirectory(candidate);
+      return {
+        folder: writablePath,
+        fallbackUsed: i > 0,
+        requestedPath: customPath ? path.resolve(customPath) : null,
+      };
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+};
+
+const resolveLoadFolders = async (overridePath?: string) => {
+  const rememberedPath = await getRememberedPath();
+  const docsPath = app.getPath('documents');
+
+  const candidates = overridePath
+    ? [path.resolve(overridePath), rememberedPath, docsPath, fallbackDataDir]
+    : [rememberedPath, docsPath, fallbackDataDir];
+
+  const uniqueCandidates = candidates.filter(Boolean) as string[];
+  return [...new Set(uniqueCandidates.map((p) => path.resolve(p)))];
+};
+
 // Save queue to prevent race conditions
 let saveQueue = Promise.resolve();
 
@@ -81,27 +130,30 @@ const queueSave = async (saveFn: () => Promise<any>) => {
 ipcMain.handle('save-db', async (event, { data, customPath }) => {
   return queueSave(async () => {
     try {
-      if (customPath) {
-        await setRememberedPath(path.resolve(customPath));
+      const resolved = await resolveSaveFolder(customPath);
+      if (!resolved) {
+        return { success: false, error: 'No writable storage folder found on this machine.' };
       }
 
-      const folder = customPath ? path.resolve(customPath) : await getRememberedPath() || app.getPath('documents');
+      const folder = resolved.folder;
       const fullPath = path.join(folder, 'inc-officer-db.json');
       const tempPath = path.join(folder, `inc-officer-db.json.tmp.${Date.now()}`);
 
-      // Validate folder exists
-      try {
-        await fs.access(folder);
-      } catch {
-        // Folder doesn't exist, try to create it
-        await fs.mkdir(folder, { recursive: true });
-      }
+      await setRememberedPath(folder);
 
       // Atomic write: write to temp file first, then rename to final destination
       await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
       await fs.rename(tempPath, fullPath);
 
-      return { success: true, savedAt: fullPath };
+      return {
+        success: true,
+        savedAt: fullPath,
+        storageFolder: folder,
+        fallbackUsed: resolved.fallbackUsed,
+        warning: resolved.fallbackUsed
+          ? `Primary storage path unavailable. Saved to fallback path: ${folder}`
+          : undefined,
+      };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
@@ -110,20 +162,30 @@ ipcMain.handle('save-db', async (event, { data, customPath }) => {
 
 ipcMain.handle('load-db', async (event, overridePath?: string) => {
   try {
-    if (overridePath) {
-      await setRememberedPath(overridePath);
+    const candidateFolders = await resolveLoadFolders(overridePath);
+
+    for (let i = 0; i < candidateFolders.length; i++) {
+      const folder = candidateFolders[i];
+      const fullPath = path.join(folder, 'inc-officer-db.json');
+      try {
+        await fs.access(fullPath);
+        const rawData = await fs.readFile(fullPath, 'utf8');
+        await setRememberedPath(folder);
+        return {
+          success: true,
+          data: JSON.parse(rawData),
+          rememberedFolder: folder,
+          fallbackUsed: i > 0,
+          warning: i > 0
+            ? `Database loaded from fallback path: ${folder}`
+            : undefined,
+        };
+      } catch {
+        continue;
+      }
     }
 
-    const folder = overridePath || await getRememberedPath() || app.getPath('documents');
-    const fullPath = path.join(folder, 'inc-officer-db.json');
-
-    try {
-      await fs.access(fullPath);
-      const rawData = await fs.readFile(fullPath, 'utf8');
-      return { success: true, data: JSON.parse(rawData), rememberedFolder: folder };
-    } catch {
-      return { success: false, message: "No database file found" };
-    }
+    return { success: false, message: 'No database file found in any known folder.' };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -253,4 +315,12 @@ ipcMain.handle('select-folder', async () => {
     return result.filePaths[0];
   }
   return null;
+});
+
+ipcMain.handle('get-app-version', async () => {
+  try {
+    return { success: true, version: app.getVersion() };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 });

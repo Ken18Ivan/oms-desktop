@@ -8,7 +8,8 @@ const ALLOWED_CHANNELS = [
   'select-folder',
   'print-to-pdf',
   'save-pdf-dialog',
-  'save-file'
+  'save-file',
+  'get-app-version'
 ];
 
 const handler = {

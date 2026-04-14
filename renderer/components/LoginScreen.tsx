@@ -8,6 +8,9 @@ interface LoginScreenProps {
   showPassword: boolean;
   setShowPassword: (val: boolean) => void;
   authError: boolean;
+  runtimeMode: 'electron' | 'browser';
+  isIpcReady: boolean;
+  runtimeHint: string;
   handleLogin: (e?: React.FormEvent) => void;
 }
 
@@ -19,6 +22,9 @@ export default function LoginScreen({
   showPassword,
   setShowPassword,
   authError,
+  runtimeMode,
+  isIpcReady,
+  runtimeHint,
   handleLogin,
 }: LoginScreenProps) {
   return (
@@ -106,6 +112,17 @@ export default function LoginScreen({
             Authorized Personnel Only
           </p>
         </div>
+
+        {!isIpcReady && (
+          <div className="mt-4 w-full rounded-xl border border-amber-300/40 bg-amber-500/10 p-3 text-left">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
+              Runtime Check: {runtimeMode === 'electron' ? 'Electron (IPC Missing)' : 'Browser Mode'}
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-amber-100/90">
+              {runtimeHint}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
