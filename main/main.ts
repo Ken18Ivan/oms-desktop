@@ -3,13 +3,55 @@ import serve from 'electron-serve';
 import { createWindow } from './helpers/create-window';
 import * as fs from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const isProd = process.env.NODE_ENV === 'production';
+// ✅ Reliable production detection (do NOT rely on NODE_ENV)
+const isProd = app.isPackaged;
 
+// ✅ ESM-safe __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * ✅ Preload resolver that matches what you found inside the INSTALLED app.asar:
+ *   \main\preload.cjs
+ *
+ * Also includes a fallback candidate, and hard-fails with an error box if not found
+ * (so IPC doesn’t silently become “unavailable”).
+ */
+const getPreloadPath = () => {
+  if (!isProd) return path.join(__dirname, 'preload.cjs');
+
+  const candidates = [
+    path.join(app.getAppPath(), 'main', 'preload.cjs'), // ✅ matches your asar listing
+    path.join(app.getAppPath(), 'app', 'preload.cjs'),  // fallback if you change packaging later
+  ];
+
+  const found = candidates.find((p) => fsSync.existsSync(p));
+  if (!found) {
+    dialog.showErrorBox(
+      'OMS Startup Error',
+      `IPC preload file not found.\n\nTried:\n${candidates.join('\n')}\n\nPlease reinstall using the latest installer.`
+    );
+    app.quit();
+    throw new Error('Preload not found');
+  }
+
+  return found;
+};
+
+/**
+ * ✅ Icon path
+ * In production, external files are alongside the exe under process.resourcesPath.
+ */
+const getIconPath = () => {
+  if (isProd) {
+    return path.join(process.resourcesPath, 'resources', 'logo.ico');
+  }
+  return path.join(__dirname, '../resources/logo.ico');
+};
 
 if (isProd) {
   serve({ directory: 'app' });
@@ -19,16 +61,33 @@ if (isProd) {
 
 (async () => {
   await app.whenReady();
-  
+
   Menu.setApplicationMenu(null);
+
+  // ✅ Optional logging to help confirm preload path on any laptop
+  const preloadPath = getPreloadPath();
+  const logLine = [
+    `[OMS] app.getAppPath()=${app.getAppPath()}`,
+    `[OMS] __dirname=${__dirname}`,
+    `[OMS] preloadPath=${preloadPath}`,
+    `[OMS] preloadExists=${fsSync.existsSync(preloadPath)}`,
+  ].join('\n');
+
+  try {
+    const logPath = path.join(app.getPath('userData'), 'oms-startup.log');
+    fsSync.mkdirSync(path.dirname(logPath), { recursive: true });
+    fsSync.writeFileSync(logPath, logLine + '\n', { encoding: 'utf-8' });
+  } catch {
+    // ignore logging failures
+  }
 
   const mainWindow = createWindow('main', {
     width: 1200,
     height: 800,
-    title: "OMS Portal",
-    icon: path.join(__dirname, '../resources/logo.ico'),
+    title: 'OMS Portal',
+    icon: getIconPath(),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
@@ -37,10 +96,10 @@ if (isProd) {
   });
 
   if (isProd) {
-    await mainWindow.loadURL('app://./index.html'); 
+    await mainWindow.loadURL('app://./index.html');
   } else {
     const port = process.argv[2];
-    await mainWindow.loadURL(`http://localhost:${port}`); 
+    await mainWindow.loadURL(`http://localhost:${port}`);
   }
 })();
 
@@ -59,8 +118,8 @@ const getRememberedPath = async () => {
       const data = await fs.readFile(configPath, 'utf-8');
       return JSON.parse(data).savedFolder;
     }
-  } catch (error) {
-    // File doesn't exist or can't be read
+  } catch {
+    // ignore
   }
   return null;
 };
@@ -141,7 +200,7 @@ ipcMain.handle('save-db', async (event, { data, customPath }) => {
 
       await setRememberedPath(folder);
 
-      // Atomic write: write to temp file first, then rename to final destination
+      // Atomic write
       await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
       await fs.rename(tempPath, fullPath);
 
@@ -176,9 +235,7 @@ ipcMain.handle('load-db', async (event, overridePath?: string) => {
           data: JSON.parse(rawData),
           rememberedFolder: folder,
           fallbackUsed: i > 0,
-          warning: i > 0
-            ? `Database loaded from fallback path: ${folder}`
-            : undefined,
+          warning: i > 0 ? `Database loaded from fallback path: ${folder}` : undefined,
         };
       } catch {
         continue;
@@ -193,9 +250,9 @@ ipcMain.handle('load-db', async (event, overridePath?: string) => {
 
 ipcMain.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
+    properties: ['openDirectory'],
   });
-  
+
   if (!result.canceled) {
     return result.filePaths[0];
   }
@@ -213,23 +270,23 @@ ipcMain.handle('print-to-pdf', async (event, { html, filename }) => {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        webSecurity: true
-      }
+        webSecurity: true,
+      },
     });
 
     await printWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const pdfData = await printWindow.webContents.printToPDF({
       landscape: false,
       margins: { marginType: 'none' },
       pageSize: 'A4',
-      printBackground: true
+      printBackground: true,
     });
 
     await fs.writeFile(filePath, pdfData);
-    
+
     printWindow.destroy();
 
     return { success: true, filePath, message: `PDF saved to ${filePath}` };
@@ -244,8 +301,8 @@ ipcMain.handle('save-pdf-dialog', async (event, { html, filename, defaultPath })
       defaultPath: path.join(app.getPath('documents'), defaultPath),
       filters: [
         { name: 'PDF Files', extensions: ['pdf'] },
-        { name: 'All Files', extensions: ['*'] }
-      ]
+        { name: 'All Files', extensions: ['*'] },
+      ],
     });
 
     if (result.canceled) {
@@ -260,23 +317,23 @@ ipcMain.handle('save-pdf-dialog', async (event, { html, filename, defaultPath })
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
-        webSecurity: true
-      }
+        webSecurity: true,
+      },
     });
 
     await printWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const pdfData = await printWindow.webContents.printToPDF({
       landscape: false,
       margins: { marginType: 'none' },
       pageSize: 'A4',
-      printBackground: true
+      printBackground: true,
     });
 
     await fs.writeFile(filePath, pdfData);
-    
+
     printWindow.destroy();
 
     return { success: true, filePath };
@@ -285,10 +342,8 @@ ipcMain.handle('save-pdf-dialog', async (event, { html, filename, defaultPath })
   }
 });
 
-// Save file to a specified path
 ipcMain.handle('save-file', async (event, { filePath, data }) => {
   try {
-    // Create folder if it doesn't exist
     const folder = path.dirname(filePath);
     try {
       await fs.access(folder);
@@ -296,7 +351,6 @@ ipcMain.handle('save-file', async (event, { filePath, data }) => {
       await fs.mkdir(folder, { recursive: true });
     }
 
-    // Write the file
     await fs.writeFile(filePath, data, 'utf-8');
     return { success: true, filePath };
   } catch (error: any) {
@@ -304,13 +358,12 @@ ipcMain.handle('save-file', async (event, { filePath, data }) => {
   }
 });
 
-// Select folder with dialog
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory'],
-    title: 'Select Database Storage Location'
+    title: 'Select Database Storage Location',
   });
-  
+
   if (!result.canceled && result.filePaths.length > 0) {
     return result.filePaths[0];
   }
